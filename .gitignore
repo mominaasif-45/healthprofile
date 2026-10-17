@@ -1,0 +1,17 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secrets - never commit
+.env
+
+# Node / Next.js
+node_modules/
+.next/
+
+# Editor / OS
+.vscode/
+Thumbs.db
+.DS_Store
