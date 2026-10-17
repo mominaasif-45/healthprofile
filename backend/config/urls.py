@@ -7,4 +7,6 @@ urlpatterns = [
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     # Shared endpoints: /api/health/ and /api/csrf/
     path("api/", include("core.urls")),
+    # User auth: /api/auth/signup/ (login/logout come next)
+    path("api/auth/", include("accounts.urls")),
 ]
