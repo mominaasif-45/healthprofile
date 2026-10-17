@@ -67,3 +67,13 @@ class SignupSerializer(serializers.Serializer):
         except IntegrityError:
             # Two signups with the same email at the exact same moment
             raise EmailTaken()
+        
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(
+        write_only=True, trim_whitespace=False, style={"input_type": "password"}
+    )
+
+    def validate_email(self, value):
+        return value.strip().lower()
