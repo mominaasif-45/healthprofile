@@ -95,7 +95,7 @@ class AdminProfileListView(ListAPIView):
         if search:
             qs = qs.filter(Q(full_name__icontains=search) | Q(user__email__icontains=search))
 
-        return qs.order_by("-created_at", "-id")  # served by (status, created_at DESC)
+        return qs.order_by("-created_at", "-id")  # (status, created_at DESC) index is used when ?status= is filtered
 
     @extend_schema(
         tags=["admin"],
