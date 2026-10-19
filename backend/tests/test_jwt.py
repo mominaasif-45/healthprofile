@@ -8,7 +8,7 @@ from .conftest import PASSWORD, csrf_header, user_login
 def test_login_sets_httponly_cookies_and_no_token_in_body(client, user):
     res = user_login(client)
     assert res.status_code == 200
-    assert res.data["email"] == "ayesha@example.com"
+    assert res.data["email"] == "momina@example.com"
     assert "access" not in res.data and "refresh" not in res.data
     assert res.cookies["access"]["httponly"]
     assert res.cookies["refresh"]["httponly"]
@@ -51,7 +51,7 @@ def test_me_works_with_valid_cookie(client, user):
     user_login(client)
     res = client.get("/api/auth/me/")
     assert res.status_code == 200
-    assert res.data["name"] == "Ayesha Khan"
+    assert res.data["name"] == "Momina Asif"
 
 
 @pytest.mark.django_db
@@ -100,9 +100,9 @@ def test_refresh_after_logout_returns_401(client, user):
 def test_user_post_without_csrf_token_is_rejected(csrf_client, user):
     headers = csrf_header(csrf_client)
     login = csrf_client.post(
-        "/api/auth/user/login/", {"email": "ayesha@example.com", "password": PASSWORD}, format="json"
+        "/api/auth/user/login/", {"email": "momina@example.com", "password": PASSWORD}, format="json"
     )
     assert login.status_code == 200
-    body = {"full_name": "Ayesha Khan", "age_range": "25-34"}
+    body = {"full_name": "Momina Asif", "age_range": "25-34"}
     assert csrf_client.post("/api/profiles/me/", body, format="json").status_code == 403
     assert csrf_client.post("/api/profiles/me/", body, format="json", **headers).status_code == 201

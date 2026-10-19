@@ -24,7 +24,7 @@ GOALS = [
 
 # name, email, age range, contact, goals, allergies, emergency contact, status, days ago
 DEMO = [
-    ("Ayesha Khan", "ayesha.khan@example.com", "25-34", "email",
+    ("Momina Asif", "momina.asif@example.com", "25-34", "email",
      ["Sleep 7+ hours", "Walk 8,000 steps"], "Peanuts", "Bilal Ahmed", "active", 2),
     ("Bilal Ahmed", "bilal.ahmed@example.com", "35-44", "phone",
      ["Reduce stress"], "", "Sana Ahmed", "active", 3),
@@ -62,7 +62,7 @@ class Command(BaseCommand):
                     emergency_contact_phone="+92 300 0000000",
                     lifestyle_notes=(
                         "Desk job, try to walk after lunch. Prefer morning reminders."
-                        if email.startswith("ayesha") else ""
+                        if email.startswith("momina") else ""
                     ),
                     status=status,
                 ),

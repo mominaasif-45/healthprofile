@@ -166,10 +166,10 @@ Full interactive docs: **http://127.0.0.1:8000/api/docs/**
 
 ```http
 POST /api/auth/user/login/
-{ "email": "ayesha.khan@example.com", "password": "CalmMorning2026" }
+{ "email": "momina.asif@example.com", "password": "CalmMorning2026" }
 
 200 OK   (Set-Cookie: access=…; HttpOnly; SameSite=Lax, refresh=…; HttpOnly; Path=/api/auth/user/)
-{ "id": 1, "name": "Ayesha Khan", "email": "ayesha.khan@example.com", "role": "user", "date_joined": "…" }
+{ "id": 1, "name": "Momina Asif", "email": "momina.asif@example.com", "role": "user", "date_joined": "…" }
 ```
 
 ```http
@@ -177,7 +177,7 @@ PATCH /api/profiles/me/        (X-CSRFToken header required)
 { "allergies": "Peanuts" }
 
 200 OK
-{ "full_name": "Ayesha Khan", "age_range": "25-34", "allergies": "Peanuts",
+{ "full_name": "Momina Asif", "age_range": "25-34", "allergies": "Peanuts",
   "status": "active", "completeness": { "percent": 80, "missing": ["Add your date of birth"] }, … }
 ```
 

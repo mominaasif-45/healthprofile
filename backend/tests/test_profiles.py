@@ -8,7 +8,7 @@ from .conftest import make_profile, user_login
 
 URL = "/api/profiles/me/"
 NEW = {
-    "full_name": "Ayesha Khan",
+    "full_name": "Momina Asif",
     "age_range": "25-34",
     "contact_preference": "email",
     "wellness_goals": ["Sleep 7+ hours", "Walk 8,000 steps"],
@@ -35,7 +35,7 @@ def test_create_then_read_profile(client, user):
     assert res.status_code == 201
     assert res.data["status"] == "active"
     assert res.data["completeness"]["percent"] == 60
-    assert client.get(URL).data["full_name"] == "Ayesha Khan"
+    assert client.get(URL).data["full_name"] == "Momina Asif"
 
 
 @pytest.mark.django_db
@@ -46,13 +46,13 @@ def test_second_create_returns_409(client, user, profile):
 
 @pytest.mark.django_db
 def test_user_only_sees_own_profile_and_no_route_to_others(client, user, other_user):
-    make_profile(user, full_name="Ayesha Khan")
+    make_profile(user, full_name="Momina Asif")
     other = make_profile(other_user, full_name="Bilal Ahmed")
     user_login(client)
-    assert client.get(URL).data["full_name"] == "Ayesha Khan"
+    assert client.get(URL).data["full_name"] == "Momina Asif"
     # No /profiles/{id}/ route exists at all, so another member's id can't be read.
     assert client.get(f"/api/profiles/{other.id}/").status_code == 404
-    assert client.get(f"/api/profiles/me/?id={other.id}").data["full_name"] == "Ayesha Khan"
+    assert client.get(f"/api/profiles/me/?id={other.id}").data["full_name"] == "Momina Asif"
 
 
 @pytest.mark.django_db
@@ -97,7 +97,7 @@ def test_invalid_values_return_400(client, user, profile, bad):
 @pytest.mark.django_db
 def test_needs_age_range_or_date_of_birth(client, user):
     user_login(client)
-    res = client.post(URL, {"full_name": "Ayesha Khan"}, format="json")
+    res = client.post(URL, {"full_name": "Momina Asif"}, format="json")
     assert res.status_code == 400
     assert "age_range" in res.json()["error"]["fields"]
 

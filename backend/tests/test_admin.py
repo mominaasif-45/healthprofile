@@ -21,7 +21,7 @@ def test_not_logged_in_cannot_reach_admin_routes(client, profile):
 
 @pytest.mark.django_db
 def test_non_admin_credentials_cannot_start_admin_session(client, user):
-    res = admin_login(client, email="ayesha@example.com")
+    res = admin_login(client, email="momina@example.com")
     assert res.status_code == 403
     assert "sessionid" not in res.cookies
 
@@ -44,7 +44,7 @@ def test_admin_session_cookie_is_httponly_and_not_a_user_token(client, admin):
 
 @pytest.mark.django_db
 def test_admin_session_can_list_search_and_view_detail(client, admin, user, other_user):
-    make_profile(user, full_name="Ayesha Khan")
+    make_profile(user, full_name="Momina Asif")
     bilal = make_profile(other_user, full_name="Bilal Ahmed")
     admin_login(client)
 
@@ -52,8 +52,8 @@ def test_admin_session_can_list_search_and_view_detail(client, admin, user, othe
     assert listing.status_code == 200
     assert listing.data["count"] == 2
 
-    by_name = client.get("/api/admin/profiles/?search=ayesha")
-    assert [r["full_name"] for r in by_name.data["results"]] == ["Ayesha Khan"]
+    by_name = client.get("/api/admin/profiles/?search=momina")
+    assert [r["full_name"] for r in by_name.data["results"]] == ["Momina Asif"]
 
     by_email = client.get("/api/admin/profiles/?search=bilal@")
     assert [r["full_name"] for r in by_email.data["results"]] == ["Bilal Ahmed"]

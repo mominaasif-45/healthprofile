@@ -35,7 +35,7 @@ def csrf_client():
 
 @pytest.fixture
 def user(db):
-    return User.objects.create_user(email="ayesha@example.com", password=PASSWORD, name="Ayesha Khan")
+    return User.objects.create_user(email="momina@example.com", password=PASSWORD, name="Momina Asif")
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ def profile(user):
     return make_profile(user)
 
 
-def user_login(client, email="ayesha@example.com", password=PASSWORD):
+def user_login(client, email="momina@example.com", password=PASSWORD):
     return client.post("/api/auth/user/login/", {"email": email, "password": password}, format="json")
 
 
