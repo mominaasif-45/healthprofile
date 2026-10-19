@@ -1,8 +1,12 @@
 # HealthProfile
 
-A small HealthTech app where people sign up and build a **wellness profile** (goals, contact
-preference, emergency contact), and where database-created **admins** search and review those
-profiles. Users and admins sign in through **two separate auth systems**.
+## Problem statement
+
+People need a private place to keep a wellness profile (goals, contact preference, emergency
+contact), and clinic staff need a secure way to search and review those profiles. The two groups
+must never be mixed up: members and admins sign in through **two separate auth systems**, so a
+member can never reach an admin feature, even by tampering with the browser. All data in this
+project is synthetic.
 
 > **Demo environment.** Every profile is synthetic. No real patient data. Wellness goals only,
 > never diagnoses or medical advice.
@@ -34,8 +38,9 @@ Browser ──► Next.js :3000 ──(rewrite /api/*)──► Django :8000 ─
   session (`sessionid`, HttpOnly, 30 min idle). Every admin view accepts **only** session auth and
   the `IsAdminRole` permission, so a user JWT gets **403** on admin routes.
 * **CSRF:** the JWT also lives in a cookie, so every state-changing request (user *and* admin)
-  needs the `X-CSRFToken` header. Django rotates the token at login, so the frontend re-fetches
-  `/api/csrf/` right after signing in.
+  needs the `X-CSRFToken` header. Only the **admin** login calls Django's `login()`, which rotates
+  the CSRF token, so the frontend re-fetches `/api/csrf/` right after an admin signs in. The user
+  JWT login does not call `login()` and does not rotate the token.
 * **No IDOR by design:** users only have `/api/profiles/me/`. There is no `/profiles/{id}/` route.
 * All errors share one shape: `{"error": {"code", "message", "fields"}}`.
 
@@ -77,25 +82,47 @@ Constraints: lower-case email, valid role/status/contact preference, and a profi
 birth **or** an age range.
 `wellness_goals` is a JSON list (instead of free text) so the UI can render goal chips.
 
-**Indexes**
+### Indexes
 
 | Index | Query it serves |
 |---|---|
 | unique `email` (+ lower-case CHECK) | login and signup lookups, blocks `Ali@x.com` vs `ali@x.com` |
 | unique `user_id` (from OneToOne) | `GET /profiles/me/` |
-| `(status, created_at DESC)` | admin list: `WHERE status='active' ORDER BY created_at DESC` |
+| `(status, created_at DESC)` | admin list filtered with `?status=`: `WHERE status = … ORDER BY created_at DESC` |
 
 The optional trigram index on `full_name` was left out (it needs the `pg_trgm` extension).
 
-**EXPLAIN demo**
+### EXPLAIN demo
 
 ```bash
 python manage.py seed_profiles --bulk 1000
 python manage.py shell -c "from profiles.models import HealthProfile as H; print(H.objects.filter(status='active').order_by('-created_at').explain(analyze=True))"
 ```
 
-With only 5 rows Postgres may prefer a sequential scan because it is cheaper; with ~1,000 rows the
-plan uses `profile_status_created_idx`.
+Real output with 1,006 profiles (891 active):
+
+```text
+Sort  (cost=28.66..28.90 rows=96 width=145) (actual time=0.842..0.883 rows=891 loops=1)
+  Sort Key: created_at DESC
+  Sort Method: quicksort  Memory: 170kB
+  ->  Seq Scan on profiles_healthprofile  (cost=0.00..25.50 rows=96 width=145) (actual time=0.016..0.327 rows=891 loops=1)
+        Filter: ((status)::text = 'active'::text)
+        Rows Removed by Filter: 115
+Planning Time: 0.348 ms
+Execution Time: 0.954 ms
+```
+
+The index was **not** used here: about 89% of the rows are `active`, so reading almost the whole
+table and sorting it is cheaper for Postgres than walking the index.
+
+The same query for a selective value (`status='deactivated'`, 115 rows) does use the index:
+
+```text
+Index Scan using profile_status_created_idx on profiles_healthprofile  (cost=0.27..8.29 rows=1 width=145) (actual time=0.128..0.252 rows=115 loops=1)
+  Index Cond: ((status)::text = 'deactivated'::text)
+Planning Time: 4.123 ms
+Execution Time: 0.356 ms
+```
 
 ## Features
 
@@ -131,9 +158,23 @@ npm run dev                           # http://localhost:3000
 
 Pages: `/signup`, `/login`, `/profile`, `/admin/login`, `/admin`, `/admin/profiles/[id]`.
 
-Set `BACKEND_URL` for the frontend if Django is not on `http://127.0.0.1:8000`.
+## Environment configuration
 
-### Tests
+Real secrets live only in `backend/.env`, which is **git-ignored** and never committed. The
+committed `backend/.env.example` and `frontend/.env.example` contain placeholders only; copy them
+and fill in your own values.
+
+| File | Variable | What it does |
+|---|---|---|
+| `backend/.env` | `DEBUG` | `True` for local development. When `False`, cookies are marked `Secure` (HTTPS only). Defaults to `False` if unset. |
+| `backend/.env` | `SECRET_KEY` | Django's secret key (sessions, CSRF). Use a long random value. |
+| `backend/.env` | `JWT_SIGNING_KEY` | Key that signs the user JWTs. Keep it different from `SECRET_KEY`. |
+| `backend/.env` | `DATABASE_URL` | PostgreSQL connection string, e.g. `postgres://user:password@localhost:5432/healthprofile`. |
+| `backend/.env` | `ALLOWED_HOSTS` | Comma-separated hostnames Django will serve. Defaults to `localhost,127.0.0.1`. |
+| `backend/.env` | `CSRF_TRUSTED_ORIGINS` | Comma-separated origins allowed to send CSRF-protected requests (the Next.js frontend). Defaults to `http://localhost:3000,http://127.0.0.1:3000`. |
+| `frontend/.env` | `BACKEND_URL` | Where Next.js forwards `/api/*` calls. Defaults to `http://127.0.0.1:8000`. |
+
+## Tests
 
 ```bash
 cd backend
@@ -192,6 +233,29 @@ POST /api/auth/signup/
 
 Status codes: 400 invalid input, 401 not logged in / token expired, 403 not allowed (including
 missing CSRF), 404 not found, 409 duplicate email or profile, 429 login throttled (5 per minute).
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Sign up](docs/screenshots/signup.png) | ![My profile (light)](docs/screenshots/profile.png) |
+| Sign up | My profile, light mode |
+| ![My profile (dark)](docs/screenshots/profile-dark.png) | ![Admin list](docs/screenshots/admin.png) |
+| My profile, dark mode | Admin: member list |
+| ![Admin detail](docs/screenshots/admin-detail.png) | ![HttpOnly cookies](docs/screenshots/cookies.png) |
+| Admin: full profile | `access` / `refresh` / `sessionid` cookies are HttpOnly |
+| ![Swagger](docs/screenshots/swagger.png) | ![pytest](docs/screenshots/pytest.png) |
+| Swagger API docs | pytest run |
+
+## AI workflow
+
+How AI was used to plan, build, review and debug this project, including prompt iterations, blast
+radius control, a manual security review and a bug story: see
+[docs/ai-workflow.md](docs/ai-workflow.md).
+
+## Demo video
+
+LOOM-LINK-HERE
 
 ## Limitations
 
