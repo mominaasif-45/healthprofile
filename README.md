@@ -255,7 +255,7 @@ radius control, a manual security review and a bug story: see
 
 ## Demo video
 
-LOOM-LINK-HERE
+https://www.loom.com/share/7f3a96d221f1415b9c2abe2070b3f38e
 
 ## Limitations
 
