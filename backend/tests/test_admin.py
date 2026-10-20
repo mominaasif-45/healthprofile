@@ -53,10 +53,10 @@ def test_admin_session_can_list_search_and_view_detail(client, admin, user, othe
     assert listing.data["count"] == 2
 
     by_name = client.get("/api/admin/profiles/?search=momina")
-    assert [r["full_name"] for r in by_name.data["results"]] == ["Momina Asif"]
+    assert [r["display_name"] for r in by_name.data["results"]] == ["Momina Asif"]
 
     by_email = client.get("/api/admin/profiles/?search=bilal@")
-    assert [r["full_name"] for r in by_email.data["results"]] == ["Bilal Ahmed"]
+    assert [r["display_name"] for r in by_email.data["results"]] == ["Bilal Ahmed"]
 
     detail = client.get(f"/api/admin/profiles/{bilal.id}/")
     assert detail.status_code == 200
@@ -86,7 +86,7 @@ def test_list_is_paginated_newest_first(client, admin, db):
     page2 = client.get("/api/admin/profiles/?page=2")
     assert page1.data["count"] == 12
     assert len(page1.data["results"]) == 10 and len(page2.data["results"]) == 2
-    assert page1.data["results"][0]["full_name"] == "Member 11"
+    assert page1.data["results"][0]["display_name"] == "Member 11"
 
 
 @pytest.mark.django_db
