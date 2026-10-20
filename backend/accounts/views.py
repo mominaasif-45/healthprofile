@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import update_last_login
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import APIException, PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -35,7 +35,12 @@ class SignupView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
-    @extend_schema(request=SignupSerializer, responses={201: UserSerializer}, tags=["auth"])
+    @extend_schema(
+        tags=["auth"], summary="Sign up",
+        description="Creates a standard member account. Only name, email and password are read; a `role` in the body is ignored. 409 if the email is taken (any letter case).",
+        request=SignupSerializer, responses={201: UserSerializer},
+        examples=[OpenApiExample("Sign up", request_only=True, value={"name": "Momina Asif", "email": "momina@example.com", "password": "a-long-passphrase-2026"})],
+    )
     def post(self, request):
         serializer = SignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -51,7 +56,12 @@ class UserLoginView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"            # max 5 attempts per minute (settings.py)
 
-    @extend_schema(request=LoginSerializer, responses={200: UserSerializer}, tags=["auth"])
+    @extend_schema(
+        tags=["auth"], summary="Member sign in",
+        description="Sets the HttpOnly `access` (15 min) and `refresh` (1 day) cookies. No token is returned in the body. Throttled to 5 attempts per minute (429). Admins must use /api/admin/login/.",
+        request=LoginSerializer, responses={200: UserSerializer},
+        examples=[OpenApiExample("Login", request_only=True, value={"email": "momina.asif@example.com", "password": "••••••••••"})],
+    )
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -80,7 +90,11 @@ class UserRefreshView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
-    @extend_schema(request=None, responses={200: UserSerializer}, tags=["auth"])
+    @extend_schema(
+        tags=["auth"], summary="Refresh the session",
+        description="Swaps the refresh cookie for new cookies; the old refresh token is blacklisted. Send the X-CSRFToken header.",
+        request=None, responses={200: UserSerializer},
+    )
     def post(self, request):
         enforce_csrf(request)
         raw = request.COOKIES.get(settings.AUTH_COOKIE_REFRESH)
@@ -107,7 +121,11 @@ class UserLogoutView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
-    @extend_schema(request=None, responses={204: None}, tags=["auth"])
+    @extend_schema(
+        tags=["auth"], summary="Member sign out",
+        description="Blacklists the refresh token and clears both cookies. Send the X-CSRFToken header.",
+        request=None, responses={204: None},
+    )
     def post(self, request):
         enforce_csrf(request)
         raw = request.COOKIES.get(settings.AUTH_COOKIE_REFRESH)
@@ -127,6 +145,10 @@ class MeView(APIView):
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(responses={200: UserSerializer}, tags=["auth"])
+    @extend_schema(
+        tags=["auth"], summary="Who am I (member)",
+        description="The signed-in member. Needs the `access` cookie (401 otherwise).",
+        responses={200: UserSerializer},
+    )
     def get(self, request):
         return Response(UserSerializer(request.user).data)
