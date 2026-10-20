@@ -1,97 +1,52 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { IconClock, IconLock, IconShield, IconTarget, IconUser } from "@/components/Icons";
+import { useCallback, useEffect, useState } from "react";
+import { CompletionBadge } from "@/components/Completion";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { IconCheck, IconClock, IconLock, IconShield, IconTarget, IconUser, IconUsers } from "@/components/Icons";
+import { ContactsCard } from "@/components/profile/ContactsCard";
+import { DemographicsCard } from "@/components/profile/DemographicsCard";
+import { WellnessCard } from "@/components/profile/WellnessCard";
 import { Shell } from "@/components/Shell";
 import { ThemeToggle } from "@/components/Theme";
 import { ApiError, api, errorMessage, minutesUntilRenewal, userLogout, type Profile, type User } from "@/lib/api";
 import { dateTime, greeting } from "@/lib/format";
 
-const AGE_RANGES = ["18-24", "25-34", "35-44", "45-54", "55-64", "65+"];
-const CONTACTS: { value: "email" | "phone" | "sms"; label: string }[] = [
-  { value: "email", label: "Email" },
-  { value: "phone", label: "Phone" },
-  { value: "sms", label: "SMS" },
-];
-const SUGGESTED = ["Sleep 7+ hours", "Walk 8,000 steps", "Reduce stress", "More vegetables"];
-
-type Form = {
-  full_name: string;
-  date_of_birth: string;
-  age_range: string;
-  contact_preference: "email" | "phone" | "sms";
-  wellness_goals: string[];
-  lifestyle_notes: string;
-  allergies: string;
-  emergency_contact_name: string;
-  emergency_contact_phone: string;
-};
-
-const emptyForm = (name = ""): Form => ({
-  full_name: name,
-  date_of_birth: "",
-  age_range: "",
-  contact_preference: "email",
-  wellness_goals: [],
-  lifestyle_notes: "",
-  allergies: "",
-  emergency_contact_name: "",
-  emergency_contact_phone: "",
-});
-
-const fromProfile = (p: Profile): Form => ({
-  full_name: p.full_name,
-  date_of_birth: p.date_of_birth ?? "",
-  age_range: p.age_range ?? "",
-  contact_preference: p.contact_preference,
-  wellness_goals: p.wellness_goals,
-  lifestyle_notes: p.lifestyle_notes,
-  allergies: p.allergies,
-  emergency_contact_name: p.emergency_contact_name,
-  emergency_contact_phone: p.emergency_contact_phone,
-});
-
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [form, setForm] = useState<Form>(emptyForm());
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+  const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [addingGoal, setAddingGoal] = useState(false);
-  const [newGoal, setNewGoal] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [renews, setRenews] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
+  const reload = useCallback(async () => {
     try {
-      const me = await api<User>("/auth/me/");
-      setUser(me);
-      try {
-        const p = await api<Profile>("/profiles/me/");
-        setProfile(p);
-        setForm(fromProfile(p));
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 404) setForm(emptyForm(me.name));
-        else throw err;
-      }
-      setLoading(false);
+      setProfile(await api<Profile>("/profiles/me/"));
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) router.replace("/login");
-      else {
-        setError(err);
+      if (err instanceof ApiError && err.status === 404) setProfile(null);
+      else throw err;
+    }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setUser(await api<User>("/auth/me/"));
+        await reload();
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) router.replace("/login");
+        else setError(errorMessage(err));
+      } finally {
         setLoading(false);
       }
-    }
-  }, [router]);
-
-  // Fetching on mount is the intended use of an effect here; load() only sets state after awaiting the API.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
+    })();
+  }, [reload, router]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -106,53 +61,41 @@ export default function ProfilePage() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const deactivated = profile?.status === "deactivated";
-  const isNew = !profile;
-  const dirty = useMemo(
-    () => (profile ? JSON.stringify(form) !== JSON.stringify(fromProfile(profile)) : true),
-    [form, profile]
-  );
-
-  const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const fieldErr = (name: string) => (error instanceof ApiError ? error.fields[name]?.[0] : undefined);
-
-  function toggleGoal(goal: string) {
-    set(
-      "wellness_goals",
-      form.wellness_goals.includes(goal)
-        ? form.wellness_goals.filter((g) => g !== goal)
-        : [...form.wellness_goals, goal]
-    );
-  }
-
-  function addGoal() {
-    const g = newGoal.trim();
-    if (g && !form.wellness_goals.some((x) => x.toLowerCase() === g.toLowerCase())) {
-      set("wellness_goals", [...form.wellness_goals, g]);
-    }
-    setNewGoal("");
-    setAddingGoal(false);
-  }
-
-  async function save() {
-    setSaving(true);
+  async function afterChange(message: string) {
     setError(null);
-    const body = {
-      ...form,
-      date_of_birth: form.date_of_birth || null,
-      age_range: form.age_range || null,
-    };
     try {
-      const saved = isNew
-        ? await api<Profile>("/profiles/me/", { method: "POST", body })
-        : await api<Profile>("/profiles/me/", { method: "PATCH", body });
-      setProfile(saved);
-      setForm(fromProfile(saved));
-      setToast(isNew ? "Profile created" : "Changes saved");
+      await reload();
+      setToast(message);
     } catch (err) {
-      setError(err);
+      setError(errorMessage(err));
+    }
+  }
+
+  async function createProfile() {
+    setCreating(true);
+    setError(null);
+    try {
+      await api("/profiles/me/", { method: "POST" });
+      await afterChange("Profile created. Fill in each section below.");
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
-      setSaving(false);
+      setCreating(false);
+    }
+  }
+
+  async function deleteProfile() {
+    setDeleting(true);
+    try {
+      await api("/profiles/me/", { method: "DELETE" });
+      setConfirmDelete(false);
+      setProfile(null);
+      setToast("Profile deleted. Your account is still active.");
+    } catch (err) {
+      setConfirmDelete(false);
+      setError(errorMessage(err));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -160,11 +103,6 @@ export default function ProfilePage() {
     await userLogout().catch(() => {});
     router.replace("/login");
   }
-
-  const goalOptions = [...SUGGESTED, ...form.wellness_goals.filter((g) => !SUGGESTED.includes(g))];
-  const firstName = (user?.name ?? "").split(" ")[0];
-  const generalError =
-    error && !(error instanceof ApiError && Object.keys(error.fields).length > 0) ? errorMessage(error) : null;
 
   if (loading) {
     return (
@@ -175,11 +113,22 @@ export default function ProfilePage() {
     );
   }
 
+  const deactivated = profile?.status === "deactivated";
+  const firstName = (user?.name ?? "").split(" ")[0];
+  const steps = [
+    { label: "Demographics", done: !!profile?.demographics },
+    { label: "Emergency contact", done: (profile?.emergency_contacts.length ?? 0) > 0 },
+    { label: "Wellness preferences", done: !!profile?.wellness },
+    { label: "At least one goal", done: (profile?.wellness?.goals.length ?? 0) > 0 },
+  ];
+
   return (
     <Shell
       nav={[
         { href: "#profile", label: "My profile", icon: <IconUser />, current: true },
-        { href: "#goals", label: "Wellness goals", icon: <IconTarget /> },
+        { href: "#contacts", label: "Emergency contacts", icon: <IconUsers /> },
+        { href: "#wellness", label: "Wellness goals", icon: <IconTarget /> },
+        { href: "/activity", label: "My activity", icon: <IconClock /> },
         { href: "#privacy", label: "Privacy and security", icon: <IconShield /> },
       ]}
       box={
@@ -196,279 +145,127 @@ export default function ProfilePage() {
           <h1>
             {greeting()}, {firstName}
           </h1>
-          <p>Keep your wellness profile up to date. Only you and clinic admins can see it.</p>
+          <p>Each section saves on its own. Only you and clinic admins can see your profile.</p>
         </div>
-        <div className="actions">
-          <ThemeToggle />
-          <button
-            className="btn"
-            onClick={() => {
-              setError(null);
-              setForm(profile ? fromProfile(profile) : emptyForm(user?.name));
-            }}
-            disabled={saving || !dirty}
-          >
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={save} disabled={saving || deactivated || !dirty}>
-            {saving ? "Saving…" : isNew ? "Create profile" : "Save changes"}
-          </button>
-        </div>
+        <ThemeToggle />
       </header>
 
+      {error && (
+        <div className="form-error" role="alert">
+          {error}
+        </div>
+      )}
       {deactivated && (
         <div className="form-error" role="status">
-          This profile has been deactivated by an administrator and can no longer be edited.
-        </div>
-      )}
-      {isNew && (
-        <div className="info-box" role="status">
-          <span>
-            Welcome! Fill in your details below and choose <strong>Create profile</strong> to save.
-          </span>
-        </div>
-      )}
-      {generalError && (
-        <div className="form-error" role="alert">
-          {generalError}
+          This profile has been deactivated by an administrator. You can read it but not change or delete it.
         </div>
       )}
 
-      <div className="content-grid">
-        <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }} disabled={deactivated}>
-          <section className="card">
-            <h2>Personal details</h2>
-            <div className="grid-2" style={{ marginTop: 14 }}>
-              <div className="field">
-                <label className="label" htmlFor="full_name">
-                  Full name
-                </label>
-                <input
-                  id="full_name"
-                  className="input"
-                  value={form.full_name}
-                  onChange={(e) => set("full_name", e.target.value)}
-                  aria-invalid={!!fieldErr("full_name")}
-                />
-                {fieldErr("full_name") && <span className="error-text">{fieldErr("full_name")}</span>}
-              </div>
-              <div className="field">
-                <label className="label" htmlFor="age_range">
-                  Age range
-                </label>
-                <select
-                  id="age_range"
-                  className="select"
-                  value={form.age_range}
-                  onChange={(e) => set("age_range", e.target.value)}
-                  aria-invalid={!!fieldErr("age_range")}
-                >
-                  <option value="">Select…</option>
-                  {AGE_RANGES.map((r) => (
-                    <option key={r} value={r}>
-                      {r.replace("-", "–")}
-                    </option>
-                  ))}
-                </select>
-                {fieldErr("age_range") && <span className="error-text">{fieldErr("age_range")}</span>}
-              </div>
-            </div>
-            <div className="grid-2">
-              <div className="field">
-                <label className="label" htmlFor="dob">
-                  Date of birth (optional)
-                </label>
-                <input
-                  id="dob"
-                  type="date"
-                  className="input"
-                  value={form.date_of_birth}
-                  max={new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => set("date_of_birth", e.target.value)}
-                  aria-invalid={!!fieldErr("date_of_birth")}
-                />
-                {fieldErr("date_of_birth") && <span className="error-text">{fieldErr("date_of_birth")}</span>}
-              </div>
-              <div className="field">
-                <span className="label" id="contact-label">
-                  Contact preference
-                </span>
-                <div className="seg" role="group" aria-labelledby="contact-label">
-                  {CONTACTS.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      className="seg-item"
-                      aria-pressed={form.contact_preference === c.value}
-                      onClick={() => set("contact_preference", c.value)}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
-                {fieldErr("contact_preference") && <span className="error-text">{fieldErr("contact_preference")}</span>}
-              </div>
-            </div>
-          </section>
+      {!profile ? (
+        <section className="card" style={{ maxWidth: 560 }}>
+          <h2>Create your wellness profile</h2>
+          <p className="sub">
+            It has four short sections: demographics, an emergency contact, wellness preferences and goals. You can fill
+            them in any order.
+          </p>
+          <button className="btn btn-primary" onClick={createProfile} disabled={creating}>
+            {creating ? "Creating…" : "Create my profile"}
+          </button>
+        </section>
+      ) : (
+        <div className="content-grid">
+          <div className="stack">
+            <DemographicsCard
+              key={`d-${profile.id}-${profile.demographics?.created_at ?? "new"}`}
+              section={profile.demographics}
+              fallbackName={user?.name ?? ""}
+              readOnly={deactivated}
+              onSaved={afterChange}
+            />
+            <ContactsCard contacts={profile.emergency_contacts} readOnly={deactivated} onChanged={afterChange} />
+            <WellnessCard
+              key={`w-${profile.id}-${profile.wellness?.created_at ?? "new"}`}
+              section={profile.wellness}
+              readOnly={deactivated}
+              onSaved={afterChange}
+            />
 
-          <section className="card" id="goals">
-            <h2>Wellness goals</h2>
-            <p className="sub">Pick what you are working on. These are personal goals, not medical advice.</p>
-            <div className="seg">
-              {goalOptions.map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  className="chip"
-                  aria-pressed={form.wellness_goals.includes(g)}
-                  onClick={() => toggleGoal(g)}
-                >
-                  {g}
+            {!deactivated && (
+              <section className="card danger-zone" aria-labelledby="danger-title">
+                <h2 id="danger-title">Delete my profile</h2>
+                <p className="sub">
+                  Removes your profile and every section. Your account stays, so you can create a new profile later.
+                </p>
+                <button className="btn btn-danger" onClick={() => setConfirmDelete(true)}>
+                  Delete my profile
                 </button>
-              ))}
-              {!addingGoal && (
-                <button type="button" className="chip chip-add" onClick={() => setAddingGoal(true)}>
-                  + Add goal
-                </button>
-              )}
-            </div>
-            {addingGoal && (
-              <div className="goal-input">
-                <input
-                  className="input"
-                  autoFocus
-                  placeholder="e.g. Stretch every morning"
-                  maxLength={60}
-                  value={newGoal}
-                  onChange={(e) => setNewGoal(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addGoal();
-                    }
-                    if (e.key === "Escape") setAddingGoal(false);
-                  }}
-                  aria-label="New goal"
-                />
-                <button type="button" className="btn btn-sm" onClick={addGoal}>
-                  Add
-                </button>
-              </div>
+              </section>
             )}
-            {fieldErr("wellness_goals") && <p className="error-text">{fieldErr("wellness_goals")}</p>}
-            <div className="field" style={{ marginTop: 18, marginBottom: 0 }}>
-              <label className="label" htmlFor="notes">
-                Lifestyle notes (optional)
-              </label>
-              <textarea
-                id="notes"
-                className="textarea"
-                maxLength={1000}
-                value={form.lifestyle_notes}
-                onChange={(e) => set("lifestyle_notes", e.target.value)}
-                aria-invalid={!!fieldErr("lifestyle_notes")}
-              />
-              {fieldErr("lifestyle_notes") && <span className="error-text">{fieldErr("lifestyle_notes")}</span>}
-            </div>
-          </section>
+          </div>
 
-          <section className="card">
-            <h2>Allergies and emergency contact</h2>
-            <div className="grid-3" style={{ marginTop: 14 }}>
-              <div className="field">
-                <label className="label" htmlFor="allergies">
-                  Allergies (optional)
-                </label>
-                <input
-                  id="allergies"
-                  className="input"
-                  maxLength={500}
-                  value={form.allergies}
-                  onChange={(e) => set("allergies", e.target.value)}
-                  aria-invalid={!!fieldErr("allergies")}
-                />
-                {fieldErr("allergies") && <span className="error-text">{fieldErr("allergies")}</span>}
+          <aside className="aside">
+            <section className="hero-card" aria-label="Profile completion">
+              <div className="row">
+                <strong>Profile completion</strong>
+                <span className="badge">{deactivated ? "Deactivated" : "Active"}</span>
               </div>
-              <div className="field">
-                <label className="label" htmlFor="ename">
-                  Emergency contact
-                </label>
-                <input
-                  id="ename"
-                  className="input"
-                  value={form.emergency_contact_name}
-                  onChange={(e) => set("emergency_contact_name", e.target.value)}
-                  aria-invalid={!!fieldErr("emergency_contact_name")}
-                />
-                {fieldErr("emergency_contact_name") && (
-                  <span className="error-text">{fieldErr("emergency_contact_name")}</span>
-                )}
+              <div className="big">{profile.completion.percent}%</div>
+              <div className="bar" role="progressbar" aria-valuenow={profile.completion.percent} aria-valuemin={0} aria-valuemax={100}>
+                <i style={{ width: `${profile.completion.percent}%` }} />
               </div>
-              <div className="field">
-                <label className="label" htmlFor="ephone">
-                  Contact phone
-                </label>
-                <input
-                  id="ephone"
-                  type="tel"
-                  className="input"
-                  placeholder="+92 300 0000000"
-                  value={form.emergency_contact_phone}
-                  onChange={(e) => set("emergency_contact_phone", e.target.value)}
-                  aria-invalid={!!fieldErr("emergency_contact_phone")}
-                />
-                {fieldErr("emergency_contact_phone") && (
-                  <span className="error-text">{fieldErr("emergency_contact_phone")}</span>
-                )}
-              </div>
-            </div>
-          </section>
-        </fieldset>
+              <ul className="steps">
+                {steps.map((s) => (
+                  <li key={s.label} className={s.done ? "done" : ""}>
+                    <span className="tick">{s.done && <IconCheck size={12} />}</span>
+                    {s.label}
+                  </li>
+                ))}
+              </ul>
+            </section>
 
-        <aside className="aside">
-          <section className="hero-card" aria-label="Profile strength">
-            <div className="row">
-              <strong>Profile strength</strong>
-              <span className="badge">{profile ? (deactivated ? "Deactivated" : "Active") : "Draft"}</span>
-            </div>
-            <div className="big">{profile?.completeness.percent ?? 0}%</div>
-            <div className="bar" role="progressbar" aria-valuenow={profile?.completeness.percent ?? 0} aria-valuemin={0} aria-valuemax={100}>
-              <i style={{ width: `${profile?.completeness.percent ?? 0}%` }} />
-            </div>
-            <p className="hint">
-              {profile
-                ? profile.completeness.missing[0]
-                  ? `${profile.completeness.missing[0]} to complete your profile.`
-                  : "Your profile is complete. Nice work."
-                : "Create your profile to see your strength."}
-            </p>
-          </section>
+            <section className="card" id="privacy">
+              <h2 style={{ fontSize: 15 }}>Your session</h2>
+              <div className="list-row">
+                <span className="icon-tile">
+                  <IconLock size={16} />
+                </span>
+                <div>
+                  <strong style={{ fontSize: 13 }}>Signed in securely</strong>
+                  <small>Token kept in an HttpOnly cookie</small>
+                </div>
+              </div>
+              <div className="list-row">
+                <span className="icon-tile">
+                  <IconClock size={16} />
+                </span>
+                <div>
+                  <strong style={{ fontSize: 13 }}>
+                    {renews === null ? "Renews automatically" : renews === 0 ? "Renews on next request" : `Renews in ${renews} min`}
+                  </strong>
+                  <small>Last updated {dateTime(profile.updated_at)}</small>
+                </div>
+              </div>
+              <div style={{ marginTop: 6 }}>
+                <CompletionBadge status={profile.completion.status} />
+              </div>
+            </section>
+          </aside>
+        </div>
+      )}
 
-          <section className="card" id="privacy">
-            <h2 style={{ fontSize: 15 }}>Your session</h2>
-            <div className="list-row">
-              <span className="icon-tile">
-                <IconLock size={16} />
-              </span>
-              <div>
-                <strong style={{ fontSize: 13 }}>Signed in securely</strong>
-                <small>Token kept in an HttpOnly cookie</small>
-              </div>
-            </div>
-            <div className="list-row">
-              <span className="icon-tile">
-                <IconClock size={16} />
-              </span>
-              <div>
-                <strong style={{ fontSize: 13 }}>
-                  {renews === null ? "Renews automatically" : renews === 0 ? "Renews on next request" : `Renews in ${renews} min`}
-                </strong>
-                <small>{profile ? `Last updated ${dateTime(profile.updated_at)}` : "No profile saved yet"}</small>
-              </div>
-            </div>
-          </section>
-        </aside>
-      </div>
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete your profile?"
+          confirmLabel="Delete my profile"
+          typeToConfirm="DELETE"
+          busy={deleting}
+          onConfirm={deleteProfile}
+          onCancel={() => setConfirmDelete(false)}
+        >
+          This permanently removes your demographics, emergency contacts, wellness preferences and goals. Your account
+          stays active.
+        </ConfirmDialog>
+      )}
 
       {toast && (
         <div className="toast" role="status">
