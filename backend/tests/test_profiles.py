@@ -1,47 +1,76 @@
-import time
+"""
+Member root-profile behaviour and role boundaries.
 
+(Rewritten for Week 2: the Week 1 tests PATCHed columns that now live in section tables.
+ Their intent is kept here: no cookie -> 401, own data only, no route to others, 409 on a
+ second create, owner cannot set status/role, deactivated profiles are read-only.)
+"""
 import pytest
 
+from audit.models import AuditEvent
 from profiles.models import HealthProfile
 
-from .conftest import make_profile, user_login
+from .conftest import csrf_header, make_profile, user_login
 
-URL = "/api/profiles/me/"
-NEW = {
-    "full_name": "Momina Asif",
-    "age_range": "25-34",
-    "contact_preference": "email",
-    "wellness_goals": ["Sleep 7+ hours", "Walk 8,000 steps"],
-    "emergency_contact_name": "Bilal Ahmed",
-    "emergency_contact_phone": "+92 300 0000000",
-}
+ROOT = "/api/profiles/me/"
+DEMO = {"full_name": "Momina Asif", "age_range": "25-34"}
+WELLNESS = {"contact_preference": "email", "goals": ["better_sleep"]}
+CONTACT = {"name": "Bilal Ahmed", "relationship": "sibling", "phone": "+92 300 0000001"}
+
+# (method, url, body) for EVERY member route
+ALL_MEMBER_ROUTES = [
+    ("get", ROOT, None), ("post", ROOT, None), ("delete", ROOT, None),
+    ("get", ROOT + "demographics/", None), ("put", ROOT + "demographics/", DEMO),
+    ("patch", ROOT + "demographics/", {"city": "Lahore"}),
+    ("get", ROOT + "wellness/", None), ("put", ROOT + "wellness/", WELLNESS),
+    ("patch", ROOT + "wellness/", {"goals": []}),
+    ("get", ROOT + "emergency-contacts/", None), ("post", ROOT + "emergency-contacts/", CONTACT),
+    ("get", ROOT + "emergency-contacts/1/", None), ("patch", ROOT + "emergency-contacts/1/", {"name": "X Y"}),
+    ("delete", ROOT + "emergency-contacts/1/", None), ("get", ROOT + "activity/", None),
+]
 
 
 @pytest.mark.django_db
-def test_no_cookie_returns_401(client):
-    assert client.get(URL).status_code == 401
+@pytest.mark.parametrize("method,url,body", ALL_MEMBER_ROUTES)
+def test_no_cookie_returns_401_on_every_member_route(client, method, url, body):
+    res = getattr(client, method)(url, body, format="json")
+    assert res.status_code == 401
 
 
 @pytest.mark.django_db
 def test_get_without_profile_returns_404(client, user):
     user_login(client)
-    assert client.get(URL).status_code == 404
+    for url in (ROOT, ROOT + "demographics/", ROOT + "wellness/", ROOT + "emergency-contacts/"):
+        assert client.get(url).status_code == 404, url
 
 
 @pytest.mark.django_db
-def test_create_then_read_profile(client, user):
+def test_create_empty_profile_then_read_it(client, user):
     user_login(client)
-    res = client.post(URL, NEW, format="json")
+    res = client.post(ROOT, format="json")
     assert res.status_code == 201
     assert res.data["status"] == "active"
-    assert res.data["completeness"]["percent"] == 60
-    assert client.get(URL).data["full_name"] == "Momina Asif"
+    assert res.data["completion"]["percent"] == 0 and res.data["completion"]["status"] == "not_started"
+    assert res.data["demographics"] is None and res.data["wellness"] is None
+    assert res.data["emergency_contacts"] == []
+    assert client.get(ROOT).status_code == 200
 
 
 @pytest.mark.django_db
 def test_second_create_returns_409(client, user, profile):
     user_login(client)
-    assert client.post(URL, NEW, format="json").status_code == 409
+    assert client.post(ROOT, format="json").status_code == 409
+
+
+@pytest.mark.django_db
+def test_owner_cannot_choose_status_or_role_at_create(client, user):
+    user_login(client)
+    res = client.post(ROOT, {"status": "deactivated", "role": "admin", "completion_percent": 100}, format="json")
+    assert res.status_code == 201
+    profile = HealthProfile.objects.get(user=user)
+    assert (profile.status, profile.completion_percent) == ("active", 0)
+    user.refresh_from_db()
+    assert user.role == "user"
 
 
 @pytest.mark.django_db
@@ -49,69 +78,85 @@ def test_user_only_sees_own_profile_and_no_route_to_others(client, user, other_u
     make_profile(user, full_name="Momina Asif")
     other = make_profile(other_user, full_name="Bilal Ahmed")
     user_login(client)
-    assert client.get(URL).data["full_name"] == "Momina Asif"
-    # No /profiles/{id}/ route exists at all, so another member's id can't be read.
+    assert client.get(ROOT).data["demographics"]["full_name"] == "Momina Asif"
+    # No route takes a profile id, so another member's profile cannot be asked for.
     assert client.get(f"/api/profiles/{other.id}/").status_code == 404
-    assert client.get(f"/api/profiles/me/?id={other.id}").data["full_name"] == "Momina Asif"
+    assert client.get(f"{ROOT}?id={other.id}").data["demographics"]["full_name"] == "Momina Asif"
 
 
 @pytest.mark.django_db
-def test_patch_changes_one_field_only(client, user, profile):
+def test_delete_profile_removes_sections_but_keeps_the_account(client, user, profile):
     user_login(client)
-    before = client.get(URL).data
-    time.sleep(0.01)
-    res = client.patch(URL, {"allergies": "Peanuts"}, format="json")
-    assert res.status_code == 200
-    after = res.data
-    assert after["allergies"] == "Peanuts"
-    assert after["updated_at"] > before["updated_at"]
-    for field in ("full_name", "age_range", "contact_preference", "wellness_goals", "created_at"):
-        assert after[field] == before[field]
+    assert client.delete(ROOT).status_code == 204
+    assert not HealthProfile.objects.filter(user=user).exists()
+    assert client.get(ROOT).status_code == 404
+    # the account still works: sign in again and create a new profile
+    fresh = type(client)()
+    assert user_login(fresh).status_code == 200
+    assert fresh.post(ROOT, format="json").status_code == 201
 
 
+# ------------------------------------------------------------------ deactivated profile = read-only
 @pytest.mark.django_db
-def test_future_date_of_birth_returns_400(client, user, profile):
+def test_deactivated_profile_can_be_read(client, user):
+    make_profile(user, status="deactivated")
     user_login(client)
-    res = client.patch(URL, {"date_of_birth": "2999-01-01"}, format="json")
-    assert res.status_code == 400
-    assert "date_of_birth" in res.json()["error"]["fields"]
+    for url in (ROOT, ROOT + "demographics/", ROOT + "wellness/", ROOT + "emergency-contacts/", ROOT + "activity/"):
+        assert client.get(url).status_code == 200, url
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "bad",
+    "method,url,body",
     [
-        {"contact_preference": "pigeon"},
-        {"age_range": "200-300"},
-        {"emergency_contact_phone": "call me maybe"},
-        {"full_name": " "},
-        {"allergies": "x" * 501},
-        {"wellness_goals": "not a list"},
+        ("put", ROOT + "demographics/", DEMO),
+        ("patch", ROOT + "demographics/", {"city": "Karachi"}),
+        ("put", ROOT + "wellness/", WELLNESS),
+        ("patch", ROOT + "wellness/", {"allergies": "Dust"}),
+        ("post", ROOT + "emergency-contacts/", CONTACT),
+        ("delete", ROOT, None),
     ],
 )
-def test_invalid_values_return_400(client, user, profile, bad):
+def test_deactivated_profile_rejects_every_write_with_403_and_audits_it(client, user, method, url, body):
+    make_profile(user, status="deactivated")
     user_login(client)
-    assert client.patch(URL, bad, format="json").status_code == 400
+    before = AuditEvent.objects.filter(outcome="denied").count()
+    assert getattr(client, method)(url, body, format="json").status_code == 403
+    assert AuditEvent.objects.filter(outcome="denied").count() == before + 1
+    assert HealthProfile.objects.filter(user=user).exists()
 
 
 @pytest.mark.django_db
-def test_needs_age_range_or_date_of_birth(client, user):
+def test_deactivated_profile_cannot_change_or_delete_a_contact(client, user):
+    profile = make_profile(user, status="deactivated")
+    contact = profile.emergency_contacts.get()
     user_login(client)
-    res = client.post(URL, {"full_name": "Momina Asif"}, format="json")
-    assert res.status_code == 400
-    assert "age_range" in res.json()["error"]["fields"]
+    assert client.patch(f"{ROOT}emergency-contacts/{contact.id}/", {"name": "New Name"}, format="json").status_code == 403
+    assert client.delete(f"{ROOT}emergency-contacts/{contact.id}/").status_code == 403
+    assert profile.emergency_contacts.count() == 1
 
 
+# ------------------------------------------------------------------ CSRF on every write
 @pytest.mark.django_db
-def test_status_cannot_be_set_by_owner(client, user, profile):
-    user_login(client)
-    client.patch(URL, {"status": "deactivated"}, format="json")
-    profile.refresh_from_db()
-    assert profile.status == "active"
-
-
-@pytest.mark.django_db
-def test_deactivated_profile_cannot_be_edited_by_owner(client, user, profile):
-    HealthProfile.objects.filter(pk=profile.pk).update(status="deactivated")
-    user_login(client)
-    assert client.patch(URL, {"allergies": "None"}, format="json").status_code == 403
+@pytest.mark.parametrize(
+    "method,url,body",
+    [
+        ("post", ROOT, None),
+        ("delete", ROOT, None),
+        ("put", ROOT + "demographics/", DEMO),
+        ("patch", ROOT + "demographics/", {"city": "X Town"}),
+        ("put", ROOT + "wellness/", WELLNESS),
+        ("patch", ROOT + "wellness/", {"goals": []}),
+        ("post", ROOT + "emergency-contacts/", CONTACT),
+        ("patch", ROOT + "emergency-contacts/1/", {"name": "New Name"}),
+        ("delete", ROOT + "emergency-contacts/1/", None),
+    ],
+)
+def test_every_member_write_without_csrf_header_is_403(csrf_client, user, profile, method, url, body):
+    csrf_header(csrf_client)
+    assert csrf_client.post(
+        "/api/auth/user/login/", {"email": "momina@example.com", "password": "CalmMorning2026"}, format="json"
+    ).status_code == 200
+    res = getattr(csrf_client, method)(url, body, format="json")  # no X-CSRFToken header
+    assert res.status_code == 403
+    assert "CSRF" in res.json()["error"]["message"]
