@@ -167,7 +167,7 @@ OUTPUT
 ## 7. Verification
 
 - `python manage.py check`: no issues
-- `python -m pytest -v`: **51 passed** (screenshot in README)
+- `python -m pytest -v`: **56 passed** (screenshot in README)
 - `npm run lint`: no errors · `npm run build`: compiled successfully, all 8 routes built
 - Manual click-through of every page (signup, login, profile, admin login, dashboard, detail) in light and dark mode: everything worked. The member access token expires after 15 minutes and the admin session after 30 minutes of inactivity, which forced a fresh sign-in exactly as designed.
 - **EXPLAIN** (README): for `status='active'` (about 89% of rows) Postgres chose a sequential scan, because reading the whole small table is cheaper. For the selective `status='deactivated'` filter it used `profile_status_created_idx`. The index helps selective filters, not the common case.
