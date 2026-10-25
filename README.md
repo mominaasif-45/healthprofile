@@ -314,25 +314,128 @@ composite index starts with `actor`), so it was dropped in `audit/0002`, and Pos
 
 ## Run it locally
 
-Prerequisites: Python 3.13, PostgreSQL, Node 20+.
+**Prerequisites:** Python **3.12 or newer**, PostgreSQL, Node 20+.
+
+> Django 6 (pinned in `requirements.txt`) does not support older Python versions. On Python 3.11 or below,
+> `pip install -r requirements.txt` fails because no matching Django version can be installed. Check yours with
+> `python --version`.
+
+Start the **backend first, then the frontend**. The frontend forwards its `/api/*` calls to the backend, so
+sign-in, sign-up and every page that loads data fail until the backend is running.
+
+Each block below says which shell it is for. Run the steps in order.
+
+### 1. Create the PostgreSQL database and login
+
+Do this once. Pick your own password and keep it to yourself; never commit it.
+
+In **pgAdmin**: connect to your server, then open *Query Tool* on the `postgres` database and run the SQL below.
+Or from a terminal with `psql -U postgres`.
+
+```sql
+CREATE USER healthprofile_user WITH PASSWORD 'choose-your-own-password';
+CREATE DATABASE healthprofile OWNER healthprofile_user;
+```
+
+On PostgreSQL 15 or newer, also give the user rights on the public schema (connect to the `healthprofile`
+database first; in `psql` use `\c healthprofile`):
+
+```sql
+GRANT ALL ON SCHEMA public TO healthprofile_user;
+```
+
+Your `DATABASE_URL` (step 3) will then be
+`postgres://healthprofile_user:<your-password>@localhost:5432/healthprofile`.
+
+### 2. Backend: virtualenv and dependencies
+
+**Windows PowerShell** (from the project root):
+
+```powershell
+cd backend
+py -3.12 -m venv venv                 # or: python -m venv venv  (must be Python 3.12+)
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+If PowerShell refuses to run the activate script, run
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and try again.
+
+**Windows cmd** (from the project root):
+
+```bat
+cd backend
+py -3.12 -m venv venv
+venv\Scripts\activate.bat
+pip install -r requirements.txt
+```
+
+**macOS / Linux** (bash or zsh, from the project root):
 
 ```bash
-# 1) Backend  (terminal 1)
 cd backend
-python -m venv venv
-.\venv\Scripts\Activate.ps1          # Windows PowerShell
+python3 -m venv venv                  # python3 must be 3.12+
+source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env                  # then edit DATABASE_URL, SECRET_KEY, JWT_SIGNING_KEY
+```
+
+### 3. Backend: configure `.env`
+
+You are already inside `backend/`. Copy the example file and fill it in.
+
+* PowerShell: `Copy-Item .env.example .env`
+* cmd: `copy .env.example .env`
+* macOS / Linux: `cp .env.example .env`
+
+Then edit `backend/.env`:
+
+* `DATABASE_URL`: the connection string from step 1.
+* `SECRET_KEY` and `JWT_SIGNING_KEY`: generate **two separate** random values, one for each. They must differ
+  from each other and from any example value. Run this command twice (it works in every shell, with the venv active):
+
+  ```
+  python -c "import secrets; print(secrets.token_urlsafe(64))"
+  ```
+
+  Paste the first output as `SECRET_KEY` and the second as `JWT_SIGNING_KEY`.
+* `DEBUG=True` for local development.
+
+Never commit `backend/.env`; it is git-ignored.
+
+### 4. Backend: migrate, seed and start (same commands in every shell)
+
+Still in `backend/` with the venv active:
+
+```
 python manage.py migrate
 python manage.py seed_profiles        # 5 demo members, password: CalmMorning2026
 python manage.py create_admin --email admin@healthprofile.test --name "Clinic Admin"
 python manage.py runserver            # http://127.0.0.1:8000  (Swagger: /api/docs/)
+```
 
-# 2) Frontend (terminal 2)
+`create_admin` asks for the admin password (input is hidden). Choose your own; there is no default admin password.
+Leave this terminal running.
+
+### 5. Frontend (open a second terminal)
+
+From the project root, in any shell:
+
+```
 cd frontend
 npm install
 npm run dev                           # http://localhost:3000
 ```
+
+Open http://localhost:3000. Members sign in at `/login`, admins at `/admin/login`.
+
+### Verified from a clean clone
+
+Checked on a fresh clone with a new, empty database:
+
+* `python manage.py migrate` succeeded.
+* `seed_profiles` and `create_admin` ran.
+* `python -m pytest` gave **223 passed** (with 192 warnings).
+* A member and an admin could both sign in on the fresh copy.
 
 The 5 demo members: `momina.asif` (complete), `bilal.ahmed` and `sara.noor` (in progress), `zainab.iqbal`
 (not started), `hamza.malik` (complete but deactivated), all `@example.com`.
