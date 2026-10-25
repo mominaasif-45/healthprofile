@@ -100,9 +100,20 @@ def test_refresh_after_logout_returns_401(client, user):
 def test_user_post_without_csrf_token_is_rejected(csrf_client, user):
     headers = csrf_header(csrf_client)
     login = csrf_client.post(
-        "/api/auth/user/login/", {"email": "momina@example.com", "password": PASSWORD}, format="json"
+        "/api/auth/user/login/", {"email": "momina@example.com", "password": PASSWORD},
+        format="json", **headers,
     )
     assert login.status_code == 200
     body = {"full_name": "Momina Asif", "age_range": "25-34"}
     assert csrf_client.post("/api/profiles/me/", body, format="json").status_code == 403
     assert csrf_client.post("/api/profiles/me/", body, format="json", **headers).status_code == 201
+
+
+@pytest.mark.django_db
+def test_user_login_without_csrf_token_is_rejected(csrf_client, user):
+    headers = csrf_header(csrf_client)
+    body = {"email": "momina@example.com", "password": PASSWORD}
+    res = csrf_client.post("/api/auth/user/login/", body, format="json")
+    assert res.status_code == 403
+    assert "access" not in res.cookies and "refresh" not in res.cookies
+    assert csrf_client.post("/api/auth/user/login/", body, format="json", **headers).status_code == 200

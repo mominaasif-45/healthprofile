@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { IconArrowLeft, IconUsers } from "@/components/Icons";
 import { Initials, Shell } from "@/components/Shell";
 import { ThemeToggle } from "@/components/Theme";
@@ -17,6 +18,7 @@ export default function AdminProfileDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const recordHeading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     api<AdminProfile>(`/admin/profiles/${id}/`, { auth: "admin" })
@@ -135,7 +137,9 @@ export default function AdminProfileDetailPage() {
 
           <aside className="aside">
             <section className="card">
-              <h2 style={{ fontSize: 15 }}>Record</h2>
+              <h2 ref={recordHeading} tabIndex={-1} style={{ fontSize: 15 }}>
+                Record
+              </h2>
               <dl className="kv" style={{ marginTop: 10 }}>
                 <dt>Strength</dt>
                 <dd>{profile.completeness.percent}%</dd>
@@ -155,22 +159,17 @@ export default function AdminProfileDetailPage() {
       )}
 
       {confirming && profile && (
-        <div className="modal-back" role="presentation" onClick={() => !busy && setConfirming(false)}>
-          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="dlg-title" onClick={(e) => e.stopPropagation()}>
-            <h2 id="dlg-title">Deactivate this profile?</h2>
-            <p className="muted">
-              {profile.full_name} will no longer be able to edit their profile. The data is kept.
-            </p>
-            <div className="actions">
-              <button className="btn" onClick={() => setConfirming(false)} disabled={busy}>
-                Cancel
-              </button>
-              <button className="btn btn-danger" onClick={deactivate} disabled={busy} autoFocus>
-                {busy ? "Deactivating…" : "Deactivate"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title="Deactivate this profile?"
+          confirmLabel="Deactivate"
+          busyLabel="Deactivating…"
+          busy={busy}
+          onConfirm={deactivate}
+          onCancel={() => setConfirming(false)}
+          returnFocusFallback={recordHeading}
+        >
+          {profile.full_name} will no longer be able to edit their profile. The data is kept.
+        </ConfirmDialog>
       )}
     </Shell>
   );

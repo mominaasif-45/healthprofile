@@ -1,3 +1,4 @@
+import datetime
 import time
 
 import pytest
@@ -34,7 +35,7 @@ def test_create_then_read_profile(client, user):
     res = client.post(URL, NEW, format="json")
     assert res.status_code == 201
     assert res.data["status"] == "active"
-    assert res.data["completeness"]["percent"] == 60
+    assert res.data["completeness"]["percent"] == 80  # name, dob-or-age, goals, emergency contact
     assert client.get(URL).data["full_name"] == "Momina Asif"
 
 
@@ -115,3 +116,34 @@ def test_deactivated_profile_cannot_be_edited_by_owner(client, user, profile):
     HealthProfile.objects.filter(pk=profile.pk).update(status="deactivated")
     user_login(client)
     assert client.patch(URL, {"allergies": "None"}, format="json").status_code == 403
+
+
+DOB_OR_AGE = "Add your date of birth or age range"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "dob, age_range",
+    [(None, "25-34"), (datetime.date(1995, 5, 1), None), (datetime.date(1995, 5, 1), "25-34")],
+    ids=["age-range-only", "dob-only", "both"],
+)
+def test_completeness_accepts_dob_or_age_range(client, user, dob, age_range):
+    make_profile(user, date_of_birth=dob, age_range=age_range)
+    user_login(client)
+    completeness = client.get(URL).data["completeness"]
+    assert completeness["percent"] == 60  # name, dob-or-age, goals
+    assert DOB_OR_AGE not in completeness["missing"]
+    assert not any("date of birth" in m.lower() or "age range" in m.lower() for m in completeness["missing"])
+
+
+@pytest.mark.django_db
+def test_complete_profile_with_only_age_range_reaches_100(client, user):
+    make_profile(
+        user,
+        emergency_contact_name="Bilal Ahmed",
+        emergency_contact_phone="+92 300 0000000",
+        allergies="None",
+    )
+    user_login(client)
+    completeness = client.get(URL).data["completeness"]
+    assert completeness == {"percent": 100, "missing": []}

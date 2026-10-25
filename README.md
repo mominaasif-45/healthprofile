@@ -21,7 +21,7 @@ project is synthetic.
 | Database | PostgreSQL | Real `EXPLAIN` plans, DB-level constraints |
 | Frontend | Next.js (App Router) + TypeScript | Proxies `/api/*` to Django, so the browser sees one origin |
 | API docs | drf-spectacular (Swagger at `/api/docs/`) | Click-through, testable docs |
-| Tests | pytest + pytest-django (+ freezegun) | 51 short tests |
+| Tests | pytest + pytest-django (+ freezegun) | 56 short tests |
 
 ## Architecture
 
@@ -193,7 +193,7 @@ Full interactive docs: **http://127.0.0.1:8000/api/docs/**
 |---|---|---|---|
 | GET | `/api/csrf/` | none | Sets the `csrftoken` cookie |
 | POST | `/api/auth/signup/` | none | Register → 201 / 400 / 409 |
-| POST | `/api/auth/user/login/` | none | Sets `access` + `refresh` cookies |
+| POST | `/api/auth/user/login/` | CSRF | Sets `access` + `refresh` cookies |
 | POST | `/api/auth/user/refresh/` | refresh cookie + CSRF | Rotates tokens |
 | POST | `/api/auth/user/logout/` | cookie + CSRF | Blacklists refresh, clears cookies |
 | GET | `/api/auth/me/` | JWT | Current user |
@@ -219,7 +219,7 @@ PATCH /api/profiles/me/        (X-CSRFToken header required)
 
 200 OK
 { "full_name": "Momina Asif", "age_range": "25-34", "allergies": "Peanuts",
-  "status": "active", "completeness": { "percent": 80, "missing": ["Add your date of birth"] }, … }
+  "status": "active", "completeness": { "percent": 80, "missing": ["Add an emergency contact"] }, … }
 ```
 
 ```http
