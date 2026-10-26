@@ -434,7 +434,7 @@ Checked on a fresh clone with a new, empty database:
 
 * `python manage.py migrate` succeeded.
 * `seed_profiles` and `create_admin` ran.
-* `python -m pytest` gave **224 passed** (with 192 warnings).
+* `python -m pytest` gave **223 passed** (with 192 warnings).
 * A member and an admin could both sign in on the fresh copy.
 
 The 5 demo members: `momina.asif` (complete), `bilal.ahmed` and `sara.noor` (in progress), `zainab.iqbal`
