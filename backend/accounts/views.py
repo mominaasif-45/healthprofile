@@ -53,6 +53,7 @@ class UserLoginView(APIView):
 
     @extend_schema(request=LoginSerializer, responses={200: UserSerializer}, tags=["auth"])
     def post(self, request):
+        enforce_csrf(request)  # login CSRF: prevents forced logins from other sites
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

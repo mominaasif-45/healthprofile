@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { IconSearch, IconUsers } from "@/components/Icons";
 import { Initials, Shell } from "@/components/Shell";
 import { ThemeToggle } from "@/components/Theme";
@@ -26,6 +27,11 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const seq = useRef(0);
+  const detailHeading = useRef<HTMLHeadingElement>(null);
+  // Always rendered, so focus has somewhere to go when the detail panel disappears.
+  const pageHeading = useRef<HTMLHeadingElement>(null);
+  // Bumped after a deactivate refresh; the effect below moves focus once the new list has rendered.
+  const [refocus, setRefocus] = useState(0);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -67,6 +73,13 @@ export default function AdminPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Runs after the refreshed selection is committed: the detail heading exists only if a profile is
+  // still selected (e.g. not when the Active filter just lost its last match), otherwise use the page heading.
+  useEffect(() => {
+    if (refocus === 0) return;
+    (detailHeading.current ?? pageHeading.current)?.focus();
+  }, [refocus]);
+
   const rows = data?.results ?? [];
   const selected = rows.find((r) => r.id === selectedId) ?? null;
   const total = data?.count ?? 0;
@@ -81,6 +94,7 @@ export default function AdminPage() {
       setConfirming(false);
       setToast(`${selected.full_name} was deactivated`);
       await load();
+      setRefocus((n) => n + 1); // the Deactivate button is now disabled or gone, so it cannot take focus back
     } catch (err) {
       if (!handleSessionError(err)) {
         setConfirming(false);
@@ -108,7 +122,9 @@ export default function AdminPage() {
     >
       <header className="page-head">
         <div>
-          <h1>Member profiles</h1>
+          <h1 ref={pageHeading} tabIndex={-1}>
+            Member profiles
+          </h1>
           <p>Search and review synthetic member profiles. Admin-only view.</p>
         </div>
         <ThemeToggle label />
@@ -239,7 +255,9 @@ export default function AdminPage() {
             <div className="detail-head">
               <Initials name={selected.full_name} large />
               <div style={{ minWidth: 0 }}>
-                <h2>{selected.full_name}</h2>
+                <h2 ref={detailHeading} tabIndex={-1}>
+                  {selected.full_name}
+                </h2>
                 <small className="muted" style={{ overflowWrap: "anywhere" }}>
                   {selected.email}
                 </small>
@@ -286,23 +304,18 @@ export default function AdminPage() {
       </div>
 
       {confirming && selected && (
-        <div className="modal-back" role="presentation" onClick={() => !busy && setConfirming(false)}>
-          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="dlg-title" onClick={(e) => e.stopPropagation()}>
-            <h2 id="dlg-title">Deactivate this profile?</h2>
-            <p className="muted">
-              {selected.full_name} will no longer be able to edit their profile. This is recorded as a status change
-              and the data is kept.
-            </p>
-            <div className="actions">
-              <button className="btn" onClick={() => setConfirming(false)} disabled={busy}>
-                Cancel
-              </button>
-              <button className="btn btn-danger" onClick={deactivate} disabled={busy} autoFocus>
-                {busy ? "Deactivating…" : "Deactivate"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title="Deactivate this profile?"
+          confirmLabel="Deactivate"
+          busyLabel="Deactivating…"
+          busy={busy}
+          onConfirm={deactivate}
+          onCancel={() => setConfirming(false)}
+          returnFocusFallback={pageHeading}
+        >
+          {selected.full_name} will no longer be able to edit their profile. This is recorded as a status change and
+          the data is kept.
+        </ConfirmDialog>
       )}
 
       {toast && (

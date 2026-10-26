@@ -101,8 +101,12 @@ class ProfileSerializer(serializers.ModelSerializer):
     def get_completeness(self, obj):
         """Profile strength shown on the profile page: 5 checks, 20% each."""
         checks = [
-            ("Add your age range", bool(obj.full_name and obj.age_range)),
-            ("Add your date of birth", obj.date_of_birth is not None),
+            ("Add your full name", bool(obj.full_name)),
+            # Either one is enough: they are alternatives, not both required.
+            (
+                "Add your date of birth or age range",
+                obj.date_of_birth is not None or bool(obj.age_range),
+            ),
             ("Pick at least one wellness goal", bool(obj.wellness_goals)),
             (
                 "Add an emergency contact",
