@@ -28,6 +28,10 @@ export default function AdminPage() {
   const [toast, setToast] = useState<string | null>(null);
   const seq = useRef(0);
   const detailHeading = useRef<HTMLHeadingElement>(null);
+  // Always rendered, so focus has somewhere to go when the detail panel disappears.
+  const pageHeading = useRef<HTMLHeadingElement>(null);
+  // Bumped after a deactivate refresh; the effect below moves focus once the new list has rendered.
+  const [refocus, setRefocus] = useState(0);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -69,6 +73,13 @@ export default function AdminPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Runs after the refreshed selection is committed: the detail heading exists only if a profile is
+  // still selected (e.g. not when the Active filter just lost its last match), otherwise use the page heading.
+  useEffect(() => {
+    if (refocus === 0) return;
+    (detailHeading.current ?? pageHeading.current)?.focus();
+  }, [refocus]);
+
   const rows = data?.results ?? [];
   const selected = rows.find((r) => r.id === selectedId) ?? null;
   const total = data?.count ?? 0;
@@ -83,7 +94,7 @@ export default function AdminPage() {
       setConfirming(false);
       setToast(`${selected.full_name} was deactivated`);
       await load();
-      detailHeading.current?.focus(); // the Deactivate button is now disabled, so it cannot take focus back
+      setRefocus((n) => n + 1); // the Deactivate button is now disabled or gone, so it cannot take focus back
     } catch (err) {
       if (!handleSessionError(err)) {
         setConfirming(false);
@@ -111,7 +122,9 @@ export default function AdminPage() {
     >
       <header className="page-head">
         <div>
-          <h1>Member profiles</h1>
+          <h1 ref={pageHeading} tabIndex={-1}>
+            Member profiles
+          </h1>
           <p>Search and review synthetic member profiles. Admin-only view.</p>
         </div>
         <ThemeToggle label />
@@ -298,7 +311,7 @@ export default function AdminPage() {
           busy={busy}
           onConfirm={deactivate}
           onCancel={() => setConfirming(false)}
-          returnFocusFallback={detailHeading}
+          returnFocusFallback={pageHeading}
         >
           {selected.full_name} will no longer be able to edit their profile. This is recorded as a status change and
           the data is kept.

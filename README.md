@@ -21,7 +21,7 @@ project is synthetic.
 | Database | PostgreSQL | Real `EXPLAIN` plans, DB-level constraints |
 | Frontend | Next.js (App Router) + TypeScript | Proxies `/api/*` to Django, so the browser sees one origin |
 | API docs | drf-spectacular (Swagger at `/api/docs/`) | Click-through, testable docs |
-| Tests | pytest + pytest-django (+ freezegun) | 56 short tests |
+| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 56 backend tests, 7 frontend tests |
 
 ## Architecture
 
@@ -184,6 +184,15 @@ python -m pytest
 Covers signup, user JWT (expired, tampered, blacklisted, throttled), profiles (own-data only,
 partial update, validation, 409), and admin (403 for user JWTs, session list/search/detail, CSRF on
 deactivate, logout destroys the session row).
+
+```bash
+cd frontend
+npm test
+```
+
+Covers the confirm dialog's keyboard behaviour (focus starts on Cancel, Tab / Shift+Tab stay inside,
+Escape closes but not while busy, focus returns to the opener) and where focus lands on the admin page
+after a deactivate, including when the last matching profile drops out of the list.
 
 ## API examples
 
