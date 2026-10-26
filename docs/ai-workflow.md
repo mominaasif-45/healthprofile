@@ -174,6 +174,50 @@ OUTPUT
 
 ## 8. What I'd do differently next time
 
-- I wouldn't split the build half-manual, half-AI. I spent 2–3 days writing code step by step with chat guidance and only then moved to Claude Code. Next time I would plan with AI first, then give an agent a strong structured prompt from the start, and spend my own time on reviewing, testing and understanding the code.
-- I would write the structured prompt early instead of trying to pass long chat links, which the agent couldn't read.
-- I would keep a prompt log and commit after every small working step from the first minute.
+Before asking the AI for anything, I would read the requirements properly first. Each week’s assignment builds on the last, so I would check whether anything in Week 1 needs fixing or changing before I start Week 2.
+
+## Week 2
+
+### W2.1 Tools
+
+- Claude Code did the Week 2 implementation work in the repo, following the rules in `CLAUDE.md`.
+
+### W2.2 Context management
+
+- All of Week 2 ran in one Claude Code session, so the plan, the decisions and the project rules stayed in the same context from start to finish.
+
+### W2.3 Prompt
+
+- I used the master prompt as written, without rewording it between phases.
+
+### W2.4 Blast radius
+
+- Each phase began with a plan, and I approved it with “go” every time before any code was written.
+- `CLAUDE.md` limits each phase to its own files, allows new migrations only, and forbids commits and pushes by the agent.
+
+### W2.5 What I checked by hand
+
+- `python -m pytest`: 223 tests passed on both repos.
+- A clean-clone check, documented in the README under “Verified from a clean clone”.
+- I looked at the database directly instead of trusting the model or the code (see W2.6).
+
+### W2.6 Bugs and fixes
+
+- **Shadowed index (`audit/0002`):** `audit/migrations/0002_drop_redundant_fk_indexes.py` removes the redundant automatic index on `AuditEvent.actor`.
+- **Primary-contact constraint (`profiles/0006`):** dropping the redundant index on `EmergencyContact.profile_id` in `profiles/0005` also removed the partial unique index `contact_one_primary_per_profile`, because both sit on the same column. The model still declared the constraint, so `makemigrations` saw no difference. `profiles/0006_restore_one_primary_contact_constraint.py` removes and re-adds the constraint so the index is back in the database.
+
+### W2.7 Differently
+
+- Before asking the AI for anything, I would read the requirements properly first. Each week’s assignment builds on the last, so I would check whether anything in Week 1 needs fixing or changing before I start Week 2.
+
+### My reflection
+
+**Hardest part:** When I removed an index, the “only one primary contact” rule disappeared on its own. This was the hardest part for me, because the problem wasn’t visible anywhere. The model still said the rule existed, the code looked correct, and the app looked fine. I only found out when I looked at the database and saw that two contacts were marked as primary at the same time.
+
+**Bug I understood best:** During the fresh setup, the system showed “No migrations to apply”. The .env file was still pointing to the main database instead of the new, fresh one. The main database already had every migration, so there was nothing new to apply, and the setup was not testing a clean database. I fixed this by changing the database name in .env to healthprofile_fresh. After that, every migration showed OK, which confirmed that the setup used the correct database.
+
+**What I’d do before asking AI next time:** Before asking the AI for anything, I would read the requirements properly first. Each week’s assignment builds on the last, so I would check whether anything in Week 1 needs fixing or changing before I start Week 2.
+
+**Part of the code I can explain:** I can tell whether a profile is complete by looking at the completeness percentage on the dashboard, without looking at the code. The number is worked out from four sections, each worth 25%: demographics, at least one emergency contact, wellness preferences, and at least one wellness goal. Each time a section is saved, the app counts how many are filled in and updates the stored percentage.
+
+**Part I don’t fully understand yet:** I don’t fully understand how database constraints prevent incorrect or invalid data from being saved. I know that a constraint is a rule the database enforces, and that the “one primary contact” rule was lost when an index was removed. But I’m not yet clear on how the database decides which rule applies to which table, or what happens when two rules conflict.
