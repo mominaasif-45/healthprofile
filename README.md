@@ -38,7 +38,7 @@ Week 2 (the assignment):
 - [x] **Sensitive fields hidden** from admin responses (date of birth, allergies, lifestyle notes; phones masked)
 - [x] **Foreign keys, unique constraints and composite indexes** justified by real queries, with `EXPLAIN (ANALYZE, BUFFERS)` evidence
 - [x] **Admin reactivate** and per-profile **history** endpoint
-- [x] **Role-boundary tests**: 223 tests, including every route checked for member / admin / signed-out access
+- [x] **Role-boundary tests**: 224 tests, including every route checked for member / admin / signed-out access
 - [x] **Migrations** with a data migration that moves existing Week 1 data into the new tables
 - [x] Updated **Swagger** (tags, descriptions, examples), README, `CLAUDE.md` project rules
 
@@ -52,7 +52,7 @@ Week 2 (the assignment):
 | Database | PostgreSQL | Real `EXPLAIN` plans, partial unique indexes, DB-level constraints |
 | Frontend | Next.js (App Router) + TypeScript | Proxies `/api/*` to Django, so the browser sees one origin |
 | API docs | drf-spectacular (Swagger at `/api/docs/`) | Click-through, testable docs |
-| Tests | pytest + pytest-django (+ freezegun) | 223 tests |
+| Tests | pytest + pytest-django (+ freezegun) | 224 tests |
 
 ## Architecture
 
@@ -434,7 +434,7 @@ Checked on a fresh clone with a new, empty database:
 
 * `python manage.py migrate` succeeded.
 * `seed_profiles` and `create_admin` ran.
-* `python -m pytest` gave **223 passed** (with 192 warnings).
+* `python -m pytest` gave **224 passed** (with 192 warnings).
 * A member and an admin could both sign in on the fresh copy.
 
 The 5 demo members: `momina.asif` (complete), `bilal.ahmed` and `sara.noor` (in progress), `zainab.iqbal`
@@ -470,7 +470,7 @@ Real secrets live only in `backend/.env`, which is **git-ignored** and never com
 
 ```bash
 cd backend
-python -m pytest        # 223 passed
+python -m pytest        # 224 passed
 ```
 
 | File | What it proves |
@@ -666,7 +666,7 @@ Week 1 example (still valid): `POST /api/auth/user/login/` with `{ "email": "mom
 | `admin-audit.png` | `/admin/audit` with a filter applied |
 | `swagger-week2.png` | `/api/docs/` showing the *member profile*, *admin profiles* and *admin audit* groups |
 | `explain.png` | Terminal: `python manage.py explain_queries` after `seed_profiles --bulk 1000` |
-| `pytest-week2.png` | Terminal: `python -m pytest` → **223 passed** |
+| `pytest-week2.png` | Terminal: `python -m pytest` → **224 passed** |
 
 ## AI workflow
 

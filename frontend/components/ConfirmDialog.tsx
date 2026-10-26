@@ -27,12 +27,42 @@ export function ConfirmDialog({
 }) {
   const [typed, setTyped] = useState("");
   const firstFocus = useRef<HTMLInputElement & HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const ready = !typeToConfirm || typed.trim() === typeToConfirm;
 
+  // Remember what had focus (the button that opened the dialog) and give it back on close.
   useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
     firstFocus.current?.focus();
+    return () => {
+      if (opener && document.contains(opener)) opener.focus();
+    };
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !busy) onCancel();
+      if (e.key !== "Tab") return;
+      // Keep Tab and Shift+Tab inside the dialog: wrap at either end.
+      const items = dialogRef.current?.querySelectorAll<HTMLElement>("input, button");
+      const focusable = Array.from(items ?? []).filter((el) => !(el as HTMLButtonElement).disabled);
+      if (focusable.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (!dialogRef.current?.contains(active)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -41,6 +71,7 @@ export function ConfirmDialog({
   return (
     <div className="modal-back" role="presentation" onClick={() => !busy && onCancel()}>
       <div
+        ref={dialogRef}
         className="modal"
         role="dialog"
         aria-modal="true"
@@ -65,11 +96,10 @@ export function ConfirmDialog({
           </div>
         )}
         <div className="actions">
-          <button className="btn" onClick={onCancel} disabled={busy}>
+          <button ref={typeToConfirm ? undefined : firstFocus} className="btn" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
           <button
-            ref={typeToConfirm ? undefined : firstFocus}
             className={`btn ${danger ? "btn-danger" : "btn-primary"}`}
             onClick={onConfirm}
             disabled={busy || !ready}

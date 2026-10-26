@@ -153,9 +153,9 @@ def test_deactivated_profile_cannot_change_or_delete_a_contact(client, user):
     ],
 )
 def test_every_member_write_without_csrf_header_is_403(csrf_client, user, profile, method, url, body):
-    csrf_header(csrf_client)
+    headers = csrf_header(csrf_client)
     assert csrf_client.post(
-        "/api/auth/user/login/", {"email": "momina@example.com", "password": "CalmMorning2026"}, format="json"
+        "/api/auth/user/login/", {"email": "momina@example.com", "password": "CalmMorning2026"}, format="json", **headers
     ).status_code == 200
     res = getattr(csrf_client, method)(url, body, format="json")  # no X-CSRFToken header
     assert res.status_code == 403

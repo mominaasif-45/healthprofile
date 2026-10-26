@@ -58,11 +58,12 @@ class UserLoginView(APIView):
 
     @extend_schema(
         tags=["auth"], summary="Member sign in",
-        description="Sets the HttpOnly `access` (15 min) and `refresh` (1 day) cookies. No token is returned in the body. Throttled to 5 attempts per minute (429). Admins must use /api/admin/login/.",
+        description="Sets the HttpOnly `access` (15 min) and `refresh` (1 day) cookies. No token is returned in the body. Throttled to 5 attempts per minute (429). Send the X-CSRFToken header. Admins must use /api/admin/login/.",
         request=LoginSerializer, responses={200: UserSerializer},
         examples=[OpenApiExample("Login", request_only=True, value={"email": "momina.asif@example.com", "password": "••••••••••"})],
     )
     def post(self, request):
+        enforce_csrf(request)
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
