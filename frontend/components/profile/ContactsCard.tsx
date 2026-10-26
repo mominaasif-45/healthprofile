@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ApiError, api, errorMessage, type EmergencyContact } from "@/lib/api";
 import { RELATIONSHIPS, labelOf } from "@/lib/labels";
@@ -18,7 +18,7 @@ export function ContactsCard({
 }: {
   contacts: EmergencyContact[];
   readOnly: boolean;
-  onChanged: (message: string) => void;
+  onChanged: (message: string) => void | Promise<void>;
 }) {
   const [editing, setEditing] = useState<number | "new" | null>(null);
   const [form, setForm] = useState<Form>(blank);
@@ -26,6 +26,14 @@ export function ContactsCard({
   const [general, setGeneral] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toDelete, setToDelete] = useState<EmergencyContact | null>(null);
+  // Always rendered, so focus has somewhere to go when the deleted contact's row disappears.
+  const heading = useRef<HTMLHeadingElement>(null);
+  // Bumped after a delete and reload; the effect below moves focus once the new list has rendered.
+  const [refocus, setRefocus] = useState(0);
+
+  useEffect(() => {
+    if (refocus > 0) heading.current?.focus();
+  }, [refocus]);
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -68,7 +76,8 @@ export function ContactsCard({
     try {
       await api(`/profiles/me/emergency-contacts/${toDelete.id}/`, { method: "DELETE" });
       setToDelete(null);
-      onChanged("Contact deleted");
+      await onChanged("Contact deleted");
+      setRefocus((n) => n + 1); // the row's Delete button is gone after the reload
     } catch (err) {
       setToDelete(null);
       setGeneral(errorMessage(err));
@@ -83,7 +92,9 @@ export function ContactsCard({
     <section className="card" id="contacts" aria-labelledby="contacts-title">
       <div className="section-head">
         <div>
-          <h2 id="contacts-title">Emergency contacts</h2>
+          <h2 id="contacts-title" ref={heading} tabIndex={-1}>
+            Emergency contacts
+          </h2>
           <p className="sub">Up to {MAX_CONTACTS} people. One is marked primary.</p>
         </div>
         {!readOnly && editing === null && (
@@ -167,7 +178,7 @@ export function ContactsCard({
       )}
 
       {toDelete && (
-        <ConfirmDialog title="Delete this contact?" confirmLabel="Delete contact" busy={busy} onConfirm={remove} onCancel={() => setToDelete(null)}>
+        <ConfirmDialog title="Delete this contact?" confirmLabel="Delete contact" busy={busy} onConfirm={remove} onCancel={() => setToDelete(null)} returnFocusFallback={heading}>
           {toDelete.name} will be removed from your profile.
           {toDelete.is_primary && contacts.length > 1 && " Your oldest remaining contact becomes primary."}
         </ConfirmDialog>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 /**
  * A modal confirmation. Pass `typeToConfirm` (e.g. "DELETE") to make the user type a word
@@ -15,6 +15,7 @@ export function ConfirmDialog({
   danger = true,
   onConfirm,
   onCancel,
+  returnFocusFallback,
 }: {
   title: string;
   children: ReactNode;
@@ -24,6 +25,8 @@ export function ConfirmDialog({
   danger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Where focus goes on close if the opening button can no longer take it (removed or disabled). */
+  returnFocusFallback?: RefObject<HTMLElement | null>;
 }) {
   const [typed, setTyped] = useState("");
   const firstFocus = useRef<HTMLInputElement & HTMLButtonElement>(null);
@@ -31,13 +34,16 @@ export function ConfirmDialog({
   const ready = !typeToConfirm || typed.trim() === typeToConfirm;
 
   // Remember what had focus (the button that opened the dialog) and give it back on close.
+  // If that button is gone or disabled by then, use returnFocusFallback instead.
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
+    const fallback = returnFocusFallback;
     firstFocus.current?.focus();
     return () => {
-      if (opener && document.contains(opener)) opener.focus();
+      const usable = opener && opener.isConnected && !(opener as HTMLButtonElement).disabled;
+      (usable ? opener : fallback?.current)?.focus();
     };
-  }, []);
+  }, [returnFocusFallback]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -68,6 +74,11 @@ export function ConfirmDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [busy, onCancel]);
 
+  // While busy both buttons are disabled, so keep focus on the dialog itself instead of letting it drop to the body.
+  useEffect(() => {
+    if (busy) dialogRef.current?.focus();
+  }, [busy]);
+
   return (
     <div className="modal-back" role="presentation" onClick={() => !busy && onCancel()}>
       <div
@@ -76,6 +87,7 @@ export function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="confirm-title">{title}</h2>

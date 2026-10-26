@@ -198,6 +198,7 @@ Before asking the AI for anything, I would read the requirements properly first.
 ### W2.5 What I checked by hand
 
 - `python -m pytest`: 223 tests passed on both repos.
+- After my mentor's Week 1 review: `python -m pytest` 224 passed (one new test for CSRF on member login), and `npm test` (Vitest + Testing Library) 11 passed. The confirm dialog's keyboard behaviour, first checked only by hand, now has automated tests. They also cover the review case: deactivating or reactivating the last profile that matches the filter used to leave keyboard focus on the page body; it now lands on the "Member profiles" heading. The same fix covers deleting an emergency contact (focus lands on the "Emergency contacts" heading) and deleting the whole profile (focus lands on the "Create your wellness profile" heading), and while a confirm dialog is busy, focus stays on the dialog box.
 - A clean-clone check, documented in the README under “Verified from a clean clone”.
 - I looked at the database directly instead of trusting the model or the code (see W2.6).
 

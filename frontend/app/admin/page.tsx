@@ -40,6 +40,11 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const seq = useRef(0);
+  const detailHeading = useRef<HTMLHeadingElement>(null);
+  // Always rendered, so focus has somewhere to go when the detail panel disappears.
+  const pageHeading = useRef<HTMLHeadingElement>(null);
+  // Bumped after a deactivate/reactivate refresh; the effect below moves focus once the new list has rendered.
+  const [refocus, setRefocus] = useState(0);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -87,6 +92,13 @@ export default function AdminPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Runs after the refreshed selection is committed: the detail heading exists only if a profile is
+  // still selected (e.g. not when the Active filter just lost its last match), otherwise use the page heading.
+  useEffect(() => {
+    if (refocus === 0) return;
+    (detailHeading.current ?? pageHeading.current)?.focus();
+  }, [refocus]);
+
   const rows = data?.results ?? [];
   const selected = rows.find((r) => r.id === selectedId) ?? null;
   const total = data?.count ?? 0;
@@ -113,6 +125,7 @@ export default function AdminPage() {
       setConfirming(null);
       setToast(`${selected.display_name} was ${confirming}d`);
       await load();
+      setRefocus((n) => n + 1); // the action button may now belong to another profile, or be gone with the panel
     } catch (err) {
       if (!handleSessionError(err)) {
         setConfirming(null);
@@ -127,7 +140,9 @@ export default function AdminPage() {
     <Shell staff nav={adminNav("profiles")} box={<AdminBox email={admin?.email} />} onSignOut={signOut}>
       <header className="page-head">
         <div>
-          <h1>Member profiles</h1>
+          <h1 ref={pageHeading} tabIndex={-1}>
+            Member profiles
+          </h1>
           <p>Search and review synthetic member profiles. Admin-only view.</p>
         </div>
         <ThemeToggle label />
@@ -297,7 +312,9 @@ export default function AdminPage() {
             <div className="detail-head">
               <Initials name={selected.display_name} large />
               <div style={{ minWidth: 0 }}>
-                <h2>{selected.display_name}</h2>
+                <h2 ref={detailHeading} tabIndex={-1}>
+                  {selected.display_name}
+                </h2>
                 <small className="muted" style={{ overflowWrap: "anywhere" }}>
                   {selected.email}
                 </small>
@@ -347,6 +364,7 @@ export default function AdminPage() {
           busy={busy}
           onConfirm={changeStatus}
           onCancel={() => setConfirming(null)}
+          returnFocusFallback={pageHeading}
         >
           {confirming === "deactivate"
             ? `${selected.display_name} will still be able to read their profile but not change or delete it. The data is kept and the action is recorded in the audit log.`

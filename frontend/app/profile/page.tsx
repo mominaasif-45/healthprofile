@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CompletionBadge } from "@/components/Completion";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { IconCheck, IconClock, IconLock, IconShield, IconTarget, IconUser, IconUsers } from "@/components/Icons";
@@ -24,6 +24,15 @@ export default function ProfilePage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [renews, setRenews] = useState<number | null>(null);
+  // The "Create your wellness profile" heading: where focus goes after the profile is deleted,
+  // because the Delete button and its whole section disappear with the profile.
+  const createHeading = useRef<HTMLHeadingElement>(null);
+  // Bumped after a delete; the effect below moves focus once the create card has rendered.
+  const [refocus, setRefocus] = useState(0);
+
+  useEffect(() => {
+    if (refocus > 0) createHeading.current?.focus();
+  }, [refocus]);
 
   const reload = useCallback(async () => {
     try {
@@ -91,6 +100,7 @@ export default function ProfilePage() {
       setConfirmDelete(false);
       setProfile(null);
       setToast("Profile deleted. Your account is still active.");
+      setRefocus((n) => n + 1);
     } catch (err) {
       setConfirmDelete(false);
       setError(errorMessage(err));
@@ -163,7 +173,9 @@ export default function ProfilePage() {
 
       {!profile ? (
         <section className="card" style={{ maxWidth: 560 }}>
-          <h2>Create your wellness profile</h2>
+          <h2 ref={createHeading} tabIndex={-1}>
+            Create your wellness profile
+          </h2>
           <p className="sub">
             It has four short sections: demographics, an emergency contact, wellness preferences and goals. You can fill
             them in any order.
@@ -261,6 +273,7 @@ export default function ProfilePage() {
           busy={deleting}
           onConfirm={deleteProfile}
           onCancel={() => setConfirmDelete(false)}
+          returnFocusFallback={createHeading}
         >
           This permanently removes your demographics, emergency contacts, wellness preferences and goals. Your account
           stays active.

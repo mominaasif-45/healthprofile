@@ -38,7 +38,7 @@ Week 2 (the assignment):
 - [x] **Sensitive fields hidden** from admin responses (date of birth, allergies, lifestyle notes; phones masked)
 - [x] **Foreign keys, unique constraints and composite indexes** justified by real queries, with `EXPLAIN (ANALYZE, BUFFERS)` evidence
 - [x] **Admin reactivate** and per-profile **history** endpoint
-- [x] **Role-boundary tests**: 224 tests, including every route checked for member / admin / signed-out access
+- [x] **Role-boundary tests**: 224 backend tests, including every route checked for member / admin / signed-out access
 - [x] **Migrations** with a data migration that moves existing Week 1 data into the new tables
 - [x] Updated **Swagger** (tags, descriptions, examples), README, `CLAUDE.md` project rules
 
@@ -52,7 +52,7 @@ Week 2 (the assignment):
 | Database | PostgreSQL | Real `EXPLAIN` plans, partial unique indexes, DB-level constraints |
 | Frontend | Next.js (App Router) + TypeScript | Proxies `/api/*` to Django, so the browser sees one origin |
 | API docs | drf-spectacular (Swagger at `/api/docs/`) | Click-through, testable docs |
-| Tests | pytest + pytest-django (+ freezegun) | 224 tests |
+| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 224 backend tests, 11 frontend tests |
 
 ## Architecture
 
@@ -448,7 +448,7 @@ Other commands:
 python manage.py seed_profiles --bulk 1000   # extra members + audit events for the EXPLAIN demo
 python manage.py explain_queries             # real query plans for the indexed lookups
 python manage.py makemigrations --check      # confirms no migration is missing
-npm run lint && npm run build                # in frontend/
+npm test && npm run lint && npm run build    # in frontend/
 ```
 
 ## Environment configuration
@@ -484,6 +484,18 @@ python -m pytest        # 224 passed
 | `test_sensitive_fields.py` | admin responses lack date of birth, allergies, lifestyle notes and full phones; no response anywhere contains password, token or session data |
 | `test_jwt.py`, `test_signup.py` | Week 1 auth: expiry, tampering, blacklisting, hashing, role injection ignored |
 
+```bash
+cd frontend
+npm test                # 11 passed (Vitest + Testing Library, jsdom)
+```
+
+| File | What it proves |
+|---|---|
+| `tests/ConfirmDialog.test.tsx` | the confirm dialog's keyboard behaviour: focus starts on Cancel (or on the type-to-confirm box), Tab / Shift+Tab stay inside, Escape closes but not while busy (focus then stays on the dialog box), focus returns to the opener, or to a fallback when the opener is gone or disabled |
+| `tests/admin-page.test.tsx` | where focus lands on the admin page after a deactivate or reactivate: the selected profile's heading if it is still listed, otherwise the "Member profiles" heading (e.g. when the Active filter loses its last match) |
+| `tests/contacts-card.test.tsx` | after deleting an emergency contact and reloading the list, focus lands on the "Emergency contacts" heading, not on the page body |
+| `tests/profile-page.test.tsx` | after deleting the whole profile, focus lands on the "Create your wellness profile" heading, not on the page body |
+
 ## API
 
 Full interactive docs: **http://127.0.0.1:8000/api/docs/** (Swagger, grouped by *member profile*, *admin profiles*,
@@ -495,7 +507,7 @@ Full interactive docs: **http://127.0.0.1:8000/api/docs/** (Swagger, grouped by 
 |---|---|---|---|
 | GET | `/api/csrf/` | none | Sets the `csrftoken` cookie |
 | POST | `/api/auth/signup/` | none | Register → 201 / 400 / 409 |
-| POST | `/api/auth/user/login/` | none (throttled 5/min) | Sets `access` + `refresh` cookies |
+| POST | `/api/auth/user/login/` | CSRF (throttled 5/min) | Sets `access` + `refresh` cookies |
 | POST | `/api/auth/user/refresh/` | refresh cookie + CSRF | Rotates tokens |
 | POST | `/api/auth/user/logout/` | cookie + CSRF | Blacklists refresh, clears cookies |
 | GET | `/api/auth/me/` | JWT | Current user |
