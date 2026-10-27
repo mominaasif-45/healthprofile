@@ -690,7 +690,7 @@ The rules the AI must follow in this repo are in [CLAUDE.md](CLAUDE.md).
 
 Week 1: https://www.loom.com/share/7f3a96d221f1415b9c2abe2070b3f38e
 
-Week 2: LOOM-LINK-WEEK2-HERE
+Week 2: https://www.loom.com/share/5d16ef5c30ba4496a1de8ce16270edba
 
 ## Limitations
 
