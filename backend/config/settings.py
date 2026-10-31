@@ -35,9 +35,11 @@ INSTALLED_APPS = [
     "accounts",
     "profiles",
     "adminpanel",
+    "audit",
 ]
 
 MIDDLEWARE = [
+    "core.middleware.RequestIdMiddleware",  # first, so every response carries X-Request-ID
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -142,5 +144,10 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "HealthProfile API",
     "DESCRIPTION": "Role-based HealthTech profile builder. Users: JWT in HttpOnly cookies. "
                    "Admins: server-side sessions. Synthetic data only.",
-    "VERSION": "1.0.0",
+    "VERSION": "2.0.0",
+    # Give the shared choice lists stable names in the docs (otherwise they get hash-like names).
+    "ENUM_NAME_OVERRIDES": {
+        "ProfileStatusEnum": "profiles.models.HealthProfile.Status",
+        "CompletionStatusEnum": "profiles.models.HealthProfile.CompletionStatus",
+    },
 }

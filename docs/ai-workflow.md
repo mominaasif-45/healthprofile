@@ -174,6 +174,207 @@ OUTPUT
 
 ## 8. What I'd do differently next time
 
-- I wouldn't split the build half-manual, half-AI. I spent 2–3 days writing code step by step with chat guidance and only then moved to Claude Code. Next time I would plan with AI first, then give an agent a strong structured prompt from the start, and spend my own time on reviewing, testing and understanding the code.
-- I would write the structured prompt early instead of trying to pass long chat links, which the agent couldn't read.
-- I would keep a prompt log and commit after every small working step from the first minute.
+Before asking the AI for anything, I would read the requirements properly first. Each week’s assignment builds on the last, so I would check whether anything in Week 1 needs fixing or changing before I start Week 2.
+
+## Week 2
+
+### W2.1 Tools
+
+- Claude Code did the Week 2 implementation work in the repo, following the rules in `CLAUDE.md`.
+
+### W2.2 Context management
+
+- All of Week 2 ran in one Claude Code session, so the plan, the decisions and the project rules stayed in the same context from start to finish.
+
+### W2.3 Prompt
+
+- I used the master prompt as written, without rewording it between phases.
+
+### W2.4 Blast radius
+
+- Each phase began with a plan, and I approved it with “go” every time before any code was written.
+- `CLAUDE.md` limits each phase to its own files, allows new migrations only, and forbids commits and pushes by the agent.
+
+### W2.5 What I checked by hand
+
+- `python -m pytest`: 223 tests passed on both repos.
+- After my mentor's Week 1 review: `python -m pytest` 224 passed (one new test for CSRF on member login), and `npm test` (Vitest + Testing Library) 11 passed. The confirm dialog's keyboard behaviour, first checked only by hand, now has automated tests. They also cover the review case: deactivating or reactivating the last profile that matches the filter used to leave keyboard focus on the page body; it now lands on the "Member profiles" heading. The same fix covers deleting an emergency contact (focus lands on the "Emergency contacts" heading) and deleting the whole profile (focus lands on the "Create your wellness profile" heading), and while a confirm dialog is busy, focus stays on the dialog box.
+- A clean-clone check, documented in the README under “Verified from a clean clone”.
+- I looked at the database directly instead of trusting the model or the code (see W2.6).
+
+### W2.6 Bugs and fixes
+
+- **Shadowed index (`audit/0002`):** `audit/migrations/0002_drop_redundant_fk_indexes.py` removes the redundant automatic index on `AuditEvent.actor`.
+- **Primary-contact constraint (`profiles/0006`):** dropping the redundant index on `EmergencyContact.profile_id` in `profiles/0005` also removed the partial unique index `contact_one_primary_per_profile`, because both sit on the same column. The model still declared the constraint, so `makemigrations` saw no difference. `profiles/0006_restore_one_primary_contact_constraint.py` removes and re-adds the constraint so the index is back in the database.
+
+### W2.7 Differently
+
+- Before asking the AI for anything, I would read the requirements properly first. Each week’s assignment builds on the last, so I would check whether anything in Week 1 needs fixing or changing before I start Week 2.
+
+### My reflection
+
+**Hardest part:** When I removed an index, the “only one primary contact” rule disappeared on its own. This was the hardest part for me, because the problem wasn’t visible anywhere. The model still said the rule existed, the code looked correct, and the app looked fine. I only found out when I looked at the database and saw that two contacts were marked as primary at the same time.
+
+**Bug I understood best:** During the fresh setup, the system showed “No migrations to apply”. The .env file was still pointing to the main database instead of the new, fresh one. The main database already had every migration, so there was nothing new to apply, and the setup was not testing a clean database. I fixed this by changing the database name in .env to healthprofile_fresh. After that, every migration showed OK, which confirmed that the setup used the correct database.
+
+**What I’d do before asking AI next time:** Before asking the AI for anything, I would read the requirements properly first. Each week’s assignment builds on the last, so I would check whether anything in Week 1 needs fixing or changing before I start Week 2.
+
+**Part of the code I can explain:** I can tell whether a profile is complete by looking at the completeness percentage on the dashboard, without looking at the code. The number is worked out from four sections, each worth 25%: demographics, at least one emergency contact, wellness preferences, and at least one wellness goal. Each time a section is saved, the app counts how many are filled in and updates the stored percentage.
+
+**Part I don’t fully understand yet:** I don’t fully understand how database constraints prevent incorrect or invalid data from being saved. I know that a constraint is a rule the database enforces, and that the “one primary contact” rule was lost when an index was removed. But I’m not yet clear on how the database decides which rule applies to which table, or what happens when two rules conflict.
+
+## Week 2 review response
+
+My mentor reviewed PR #3 at `9784e4d` with five code points and feedback on the Loom recording. This section records
+how the fixes were made on the same branch. The commit-by-commit mapping is in the README ("Review response (PR #3)")
+and the real output is in [docs/evidence/week2-review.md](evidence/week2-review.md).
+
+### Who did what
+
+- **The prompts** below were drafted with help from Claude in a separate chat. They are not written by me alone.
+- **I made the decisions** in them, chose between the options each plan offered, and approved every plan with "go"
+  before any code was written. I decided when each commit was pushed.
+- **Claude Code** worked in the repository in one session: it read the code, wrote each plan, wrote the tests first,
+  implemented, ran the checks and made one commit per step, following `CLAUDE.md`. It never read `.env`, added no
+  dependency, merged nothing and opened no PR.
+
+### Prompt history (as sent in the session)
+
+<details><summary>1. Start: rules and the five phases</summary>
+
+```text
+I'm Momina, a full-stack intern. My mentor reviewed my Week 2 PR #3 (branch feature/week2-profiles-audit, commit 9784e4d). I want to fix every code point in his review on this same branch, so PR #3 updates. His full review is at the end of this message.
+
+Rules:
+- Work in 5 phases, in this order: (1) audit durability, (2) phone normalisation, (3) permission re-check after the profile lock, (4) primary-contact rule, (5) evidence and handoff.
+- Before changing code in each phase, give me a short plain-language plan: what you will change, which files, and why. Wait for my "go". Then implement.
+- After each phase: add the tests the mentor asked for, run the relevant tests, and tell me in plain words what changed and what each new test checks. I have to explain it in a video. Make one commit per phase with a clear message, and show the hash. Don't push until I say so.
+- Prove each new test: it must fail on the old code and pass on the new code. Show me that.
+- Don't weaken or delete existing tests or constraints. Don't touch .env, don't print secrets, don't merge anything, and don't open a new PR.
+- Don't expand scope. No new features.
+
+Phase details:
+1. Audit durability: the mutation, the completion recalculation and the required audit write must be in one transaction. A required audit failure must roll the whole change back. Wrapping the existing exception-swallowing logger in atomic is not enough. Add failure-injection tests, including profile deletion, that prove complete rollback.
+2. Phone numbers: normalise before validation, storage and duplicate checks. Store one canonical form and enforce a deliberate digit-count range. A value like `1------` must be rejected. Tests: punctuation-heavy input, equivalent formats of the same number, duplicate PATCH, and the fourth-contact limit. Check whether existing stored data needs a migration, and tell me before writing one.
+3. Permission re-check: after acquiring the profile lock, re-check the active status using fresh state, inside the same transaction. Use one consistent locking policy for the admin deactivate/reactivate path too. Add a PostgreSQL concurrency test that pauses the member request around an admin deactivation and checks the outcome and the audit result. Keep the existing parent lock for the contact limit. Tell me which policy you chose and why.
+4. Primary contact: a non-empty contact list must always have a primary. Reject setting is_primary=false on the current primary (with a clear error), unless you can show a safer atomic switch. Tell me both options and your recommendation in the plan, and wait for my choice. Test the invariant, not only the partial unique constraint.
+5. Evidence and handoff: show a database catalog check of the primary-contact index and an attempted second primary being rejected. Update the README and docs/ai-workflow.md with the real findings, including the human corrections I made, and state that ORM guards are only application-level append-only protection, so direct database access needs its own restrictions. Check for overlap with Week 1 PR #2 (don't merge it). Run the final migrations, backend tests, frontend tests and build on the resulting branch, and tell me the exact commit that was tested.
+
+Start with Phase 1: read audit/services.py, the member views and the services, then give me your plan. Don't write code until I say go.
+
+my mentors review
+[the mentor's full review was pasted here]
+```
+</details>
+
+<details><summary>2. Phase 1 decision</summary>
+
+```text
+go. Yes to both: include admin deactivate/reactivate, and use 503 audit_unavailable. Two additions: (1) in the README, document which audit events are required (fail closed) and which are best-effort, and why. (2) Show me the failing-then-passing proof output when you’re done. Don’t push yet.
+```
+</details>
+
+<details><summary>3. Phase 2 plan request</summary>
+
+```text
+Good. Push 6a5633f to feature/week2-profiles-audit, then start Phase 2 (phone normalisation). Check the serializer, the model and the phone values already stored, then bring me the plan before writing code. Please also tell me if the new canonical format would change any existing stored numbers.
+```
+</details>
+
+<details><summary>4. Phase 2 decision</summary>
+
+```text
+go A. Two additions: (1) after the migrations, query the PostgreSQL catalog to show that contact_phone_is_canonical and the unique constraint for (profile, phone) both exist, and show an attempted non-canonical insert being rejected. Keep that output for Phase 5. (2) Run makemigrations --check and confirm that 0007 and 0008 don’t remove or change any existing constraint by accident. Show me the fail-then-pass proof as before. Commit as Phase 2 and don’t push until I say so.
+```
+</details>
+
+<details><summary>5. Phase 3 plan request</summary>
+
+```text
+push 15f7b1b
+```
+
+```text
+Push 15f7b1b to feature/week2-profiles-audit. Then start Phase 3 (permission re-check after the profile lock). Read the member views, get_profile, services._lock and the admin deactivate/reactivate path, then bring me the plan before writing code. In the plan, please explain: (1) which locking policy you recommend for admin transitions and member writes, and why; (2) what the member gets when the profile was deactivated while the request waited (status code and message); (3) what the audit outcome should be in that case, remembering the denied-write audit must not be undone by the rollback; (4) how you’ll write the PostgreSQL concurrency test in a reliable way, without flaky timing. Explain it in plain words.
+```
+</details>
+
+<details><summary>6. Phase 3 decision</summary>
+
+```text
+go. Two additions: (1) after the tests pass, run tests/test_concurrency.py 20 times in a row and show me that every run passes (to prove they’re not flaky); (2) check that leftover thread connections can’t leave locks or open connections behind, even when a test fails or times out. Give me the fail-then-pass proof as before, and explain each scenario in plain words. Commit as Phase 3 and don’t push until I say so.
+```
+</details>
+
+<details><summary>7. Phase 4 plan request</summary>
+
+```text
+Push b8dd91a to feature/week2-profiles-audit. Then start Phase 4 (the primary-contact rule). Read update_contact, create_contact and delete_contact, then bring me the plan before writing code. Please explain both options in plain words: (a) reject setting is_primary=false on the current primary, and (b) switch primary atomically in one step. Tell me which you recommend and why, what the member sees in each case, and how it affects the frontend’s edit contact form. I will choose.
+```
+</details>
+
+<details><summary>8. Phase 4 decision</summary>
+
+```text
+Go with option (a), and the ContactsCard.tsx change is approved (disable the checkbox when editing the current primary, show the hint, and show an is_primary error under it). Write the tests first, including the invariant test that checks after every step that a profile with contacts has exactly one primary. Give me the fail-then-pass proof. Run the backend tests, npm test, lint, type-check and npm run build. Say plainly in the README that ‘at least one’ is enforced in the service and ‘at most one’ by the database. Commit as Phase 4 and don’t push until I say so.
+```
+</details>
+
+<details><summary>9. Phase 5 plan request</summary>
+
+```text
+Push 3c58e99 to feature/week2-profiles-audit. Then do Phase 5 (evidence and handoff), and also add the frontend phone check to this phase: update frontend/lib/validation.ts to use the same rule as the server (optional leading +, digits, spaces, brackets and dashes, 7 to 15 digits) with a small test. Then give me a plan before changing anything. The plan should cover: (1) the database evidence: the catalog check for the primary-contact index and the phone constraint, plus an attempted second primary through raw SQL being rejected after the migrations; (2) checking overlap with Week 1 PR #2 without merging it, using a throwaway test merge (for example on a temporary local branch) and telling me exactly which files conflict and how you’d resolve them; (3) a README and docs/ai-workflow.md update with the real prompt history, the human corrections I made (for example my decisions in Phases 1, 3 and 4) and honest statements of the limits, including that the ORM guards are only application-level append-only protection and that direct database access needs its own restrictions; (4) a short ‘Review response’ section mapping each of my mentor’s five code points and Loom points to the commit that addresses it; (5) running the final migrations, backend tests, frontend tests and build on the resulting branch and naming the exact tested commit. Don’t merge anything and don’t change code until I say go.
+```
+</details>
+
+<details><summary>10. Phase 5 decision</summary>
+
+```text
+go. Answers: 1 yes, 2 yes, 3 yes, 4 two commits (first the frontend phone check, then docs and evidence). One correction for docs/ai-workflow.md: the prompts I sent you were drafted with help from Claude in a separate chat. I made the decisions and approved each plan. Write that plainly, and don’t describe the prompts as written by me alone. Keep everything else factual, and quote only what really happened in this session. Don’t push until I say so, and give me the exact tested commit at the end.
+```
+</details>
+
+### My decisions and corrections
+
+| Phase | Options I was given | What I decided or added |
+|---|---|---|
+| 1 Audit durability | Include admin deactivate / reactivate or not (it went beyond review point 1); the response for a failed audit | Included the admin path; 503 `audit_unavailable`; added: document required vs best-effort audit events in the README, and show the fail-then-pass output |
+| 2 Phone normalisation | A: normalise + data migration + database CHECK (needs phone literals in existing test setup updated to the canonical form) · B: no database constraint | Chose **A**; added: a catalog check and a rejected raw insert, kept for Phase 5, and `makemigrations --check` plus confirmation that `0007` / `0008` change no existing constraint |
+| 3 Lock and re-check | Locking policy, response, audit outcome and test approach as proposed | Approved; added: 20 consecutive runs of the concurrency tests, and a check that leftover thread connections cannot leave locks or connections behind, even when a test fails or times out |
+| 4 Primary contact | (a) reject unsetting the current primary · (b) hand the primary to the oldest other contact automatically | Chose **(a)**; approved the `ContactsCard.tsx` change (outside the earlier backend scope); asked for the README to say plainly that "at least one" is in the service and "at most one" in the database |
+| 5 Evidence and handoff | One or two commits; a throwaway database; a temporary merge branch; an evidence file | Added the frontend phone check to this phase; chose two commits; approved the throwaway database, temporary branch and evidence file; corrected this document so the prompts are not described as written by me alone |
+
+### What the checks caught
+
+My rule that every new test must fail on the old code and pass on the new code, and the extra checks I asked for,
+surfaced these during the session:
+
+- **Phase 3, plan corrected by the old-code run.** The plan predicted that scenario C (admin waits for the member's lock)
+  would fail on the old code. It passed: the old admin `UPDATE` also waited for the member's row lock. Claude Code
+  reported this; scenario D (two admins at once), added while writing the tests, is the one that fails on the old
+  admin path. C stays as a regression guard.
+- **Phase 3, the 20-run check.** The first batch of 20 runs had 1 error and a second batch had 2. They came from the
+  test's own leftover-lock check: a diagnostic showed autovacuum locking the system table `pg_trigger` on the freshly
+  created test database. The check was narrowed to client connections, then 20 / 20 runs passed. A deliberate-failure
+  demo (a failing test holding a lock, and a thread stuck past its join timeout) left 0 sessions and 0 locks behind.
+- **Tests that pass on the old code are labelled, not hidden.** 9 of 25 phone tests and 3 of 7 primary-contact tests
+  passed on the old code because that behaviour was already correct; in the frontend phone test, 4 of the 6 old-code
+  failures were only the changed message.
+- **Smaller mistakes fixed before commit.** A garbled assertion and a colliding test contact in the Phase 2 migration
+  test (fixed before the first run); stray backslashes in a README quote (Phase 4); in Phase 5 an evidence-script
+  edit failed and the unedited script hit a wrongly guessed column. It ran inside a transaction, so it was rolled back
+  and nothing was written; the script was rewritten.
+- **A gap flagged for me to decide.** After Phase 4, Claude Code pointed out that the frontend phone check still used the
+  old pattern (out of scope at the time). I added it to Phase 5.
+
+### Limits (stated honestly)
+
+- **Audit append-only is application-level only.** The ORM guards and the lack of an API route stop the application's
+  own code. Raw SQL can still update or delete audit rows (shown in the evidence file), so direct database access needs
+  its own restrictions, such as a database role without `UPDATE` / `DELETE` on the audit table, or triggers.
+- **"At least one primary contact" is enforced only in the service**; the database enforces "at most one". Raw SQL can
+  leave a profile without a primary (shown in the evidence file).
+- **Phone numbers have no country rules**: `0300 1234567` and `+92 300 1234567` are different numbers here.
+- **Required audit events fail closed**: if the audit table cannot be written, edits are refused with 503.
+- **Week 1 PR #2 is not merged.** A throwaway merge showed every conflict resolves to this branch's file; merging is left
+  to my mentor.
