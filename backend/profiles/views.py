@@ -3,7 +3,11 @@ Member endpoints. Every route lives under /api/profiles/me/ and is scoped to req
 there is no URL that carries another profile's id, so other members' data cannot be reached.
 Nested objects (emergency contacts) are looked up ONLY inside the caller's own profile, so a
 stranger's contact id returns 404 (not 403), which does not reveal that it exists.
+
+Every write runs the service call AND record_event() in one transaction.atomic(): if the
+required audit event cannot be written, the change and the completion update roll back too.
 """
+from django.db import transaction
 from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied
@@ -15,7 +19,7 @@ from rest_framework.views import APIView
 from accounts.authentication import CookieJWTAuthentication
 from audit.models import AuditEvent
 from audit.serializers import MemberActivitySerializer
-from audit.services import log_event
+from audit.services import log_event, record_event
 
 from . import services
 from .models import Demographics, EmergencyContact, HealthProfile, WellnessPreference
@@ -79,8 +83,9 @@ class MyProfileView(MemberView):
     def post(self, request):
         if HealthProfile.objects.filter(user=request.user).exists():
             raise ProfileAlreadyExists()
-        profile = HealthProfile.objects.create(user=request.user)
-        log_event(request, Action.PROFILE_CREATED, target=profile)
+        with transaction.atomic():
+            profile = HealthProfile.objects.create(user=request.user)
+            record_event(request, Action.PROFILE_CREATED, target=profile)
         return Response(ProfileSerializer(profile).data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
@@ -92,8 +97,9 @@ class MyProfileView(MemberView):
     def delete(self, request):
         profile = self.get_profile(request, write_action=Action.PROFILE_DELETED)
         profile_id = profile.pk
-        profile.delete()  # cascades to demographics, contacts, wellness and goals
-        log_event(request, Action.PROFILE_DELETED, target=("health_profile", profile_id))
+        with transaction.atomic():
+            profile.delete()  # cascades to demographics, contacts, wellness and goals
+            record_event(request, Action.PROFILE_DELETED, target=("health_profile", profile_id))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -128,8 +134,9 @@ class DemographicsView(MemberView):
         serializer = DemographicsSerializer(data=request.data)  # no instance: PUT is a full replace
         serializer.is_valid(raise_exception=True)
         existed = Demographics.objects.filter(profile=profile).exists()
-        section, changed = services.save_demographics(profile, serializer.validated_data, replace=True)
-        log_event(request, Action.DEMOGRAPHICS_UPDATED, target=profile, changed_fields=changed)
+        with transaction.atomic():
+            section, changed = services.save_demographics(profile, serializer.validated_data, replace=True)
+            record_event(request, Action.DEMOGRAPHICS_UPDATED, target=profile, changed_fields=changed)
         return Response(DemographicsSerializer(section).data,
                         status=status.HTTP_200_OK if existed else status.HTTP_201_CREATED)
 
@@ -144,8 +151,9 @@ class DemographicsView(MemberView):
         section = self._section(profile)
         serializer = DemographicsSerializer(section, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        section, changed = services.save_demographics(profile, serializer.validated_data, replace=False)
-        log_event(request, Action.DEMOGRAPHICS_UPDATED, target=profile, changed_fields=changed)
+        with transaction.atomic():
+            section, changed = services.save_demographics(profile, serializer.validated_data, replace=False)
+            record_event(request, Action.DEMOGRAPHICS_UPDATED, target=profile, changed_fields=changed)
         return Response(DemographicsSerializer(section).data)
 
 
@@ -181,8 +189,9 @@ class WellnessView(MemberView):
         serializer = WellnessSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         existed = WellnessPreference.objects.filter(profile=profile).exists()
-        section, changed = services.save_wellness(profile, serializer.validated_data, replace=True)
-        log_event(request, self._action(changed), target=profile, changed_fields=changed)
+        with transaction.atomic():
+            section, changed = services.save_wellness(profile, serializer.validated_data, replace=True)
+            record_event(request, self._action(changed), target=profile, changed_fields=changed)
         return Response(WellnessSerializer(section).data,
                         status=status.HTTP_200_OK if existed else status.HTTP_201_CREATED)
 
@@ -197,8 +206,9 @@ class WellnessView(MemberView):
         section = self._section(profile)
         serializer = WellnessSerializer(section, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        section, changed = services.save_wellness(profile, serializer.validated_data, replace=False)
-        log_event(request, self._action(changed), target=profile, changed_fields=changed)
+        with transaction.atomic():
+            section, changed = services.save_wellness(profile, serializer.validated_data, replace=False)
+            record_event(request, self._action(changed), target=profile, changed_fields=changed)
         return Response(WellnessSerializer(section).data)
 
 
@@ -227,9 +237,10 @@ class ContactListView(MemberView):
         profile = self.get_profile(request, write_action=Action.CONTACT_CREATED)
         serializer = EmergencyContactSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        contact = services.create_contact(profile, serializer.validated_data)
-        log_event(request, Action.CONTACT_CREATED, target=profile,
-                  changed_fields=sorted(serializer.validated_data))
+        with transaction.atomic():
+            contact = services.create_contact(profile, serializer.validated_data)
+            record_event(request, Action.CONTACT_CREATED, target=profile,
+                         changed_fields=sorted(serializer.validated_data))
         return Response(EmergencyContactSerializer(contact).data, status=status.HTTP_201_CREATED)
 
 
@@ -255,8 +266,9 @@ class ContactDetailView(MemberView):
         contact = self._contact(profile, pk)
         serializer = EmergencyContactSerializer(contact, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        contact, changed = services.update_contact(contact, serializer.validated_data)
-        log_event(request, Action.CONTACT_UPDATED, target=profile, changed_fields=changed)
+        with transaction.atomic():
+            contact, changed = services.update_contact(contact, serializer.validated_data)
+            record_event(request, Action.CONTACT_UPDATED, target=profile, changed_fields=changed)
         return Response(EmergencyContactSerializer(contact).data)
 
     @extend_schema(tags=TAG, summary="Delete an emergency contact",
@@ -265,8 +277,9 @@ class ContactDetailView(MemberView):
     def delete(self, request, pk):
         profile = self.get_profile(request, write_action=Action.CONTACT_DELETED)
         contact = self._contact(profile, pk)
-        services.delete_contact(contact)
-        log_event(request, Action.CONTACT_DELETED, target=profile)
+        with transaction.atomic():
+            services.delete_contact(contact)
+            record_event(request, Action.CONTACT_DELETED, target=profile)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

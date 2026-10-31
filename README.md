@@ -38,7 +38,7 @@ Week 2 (the assignment):
 - [x] **Sensitive fields hidden** from admin responses (date of birth, allergies, lifestyle notes; phones masked)
 - [x] **Foreign keys, unique constraints and composite indexes** justified by real queries, with `EXPLAIN (ANALYZE, BUFFERS)` evidence
 - [x] **Admin reactivate** and per-profile **history** endpoint
-- [x] **Role-boundary tests**: 224 backend tests, including every route checked for member / admin / signed-out access
+- [x] **Role-boundary tests**: 237 backend tests, including every route checked for member / admin / signed-out access
 - [x] **Migrations** with a data migration that moves existing Week 1 data into the new tables
 - [x] Updated **Swagger** (tags, descriptions, examples), README, `CLAUDE.md` project rules
 
@@ -52,7 +52,7 @@ Week 2 (the assignment):
 | Database | PostgreSQL | Real `EXPLAIN` plans, partial unique indexes, DB-level constraints |
 | Frontend | Next.js (App Router) + TypeScript | Proxies `/api/*` to Django, so the browser sees one origin |
 | API docs | drf-spectacular (Swagger at `/api/docs/`) | Click-through, testable docs |
-| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 224 backend tests, 11 frontend tests |
+| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 237 backend tests, 11 frontend tests |
 
 ## Architecture
 
@@ -85,13 +85,26 @@ Browser ──► Next.js :3000 ──(rewrite /api/*)──► Django :8000 ─
 |---|---|
 | `accounts` | custom `User`, signup, JWT login/refresh/logout, `CookieJWTAuthentication` |
 | `profiles` | the four section tables, `services.py` (all write rules + completion), member API |
-| `audit` | append-only `AuditEvent` model and the `log_event()` helper |
+| `audit` | append-only `AuditEvent` model, `record_event()` (required) and `log_event()` (best-effort) |
 | `adminpanel` | admin session login, `IsAdminRole`, allow-list serializers, filters, audit endpoints |
 | `core` | request-id middleware, error handler, CSRF endpoint, `explain_queries` command |
 
-Views stay thin: authenticate, validate with a serializer, call **one** function in `profiles/services.py`,
-write **one** audit event. Every service function runs in a transaction and ends with
-`recalculate_completion()`.
+Views stay thin: authenticate, validate with a serializer, then in **one** `transaction.atomic()` call **one**
+function in `profiles/services.py` and write **one** required audit event. Every service function takes the
+profile row lock and ends with `recalculate_completion()`, so the change, the stored completion and the audit
+row commit together or not at all.
+
+### Required vs best-effort audit events
+
+| Kind | Events | If the audit insert fails | Why |
+|---|---|---|---|
+| **Required (fail closed)**: `record_event()` | `profile.created`, `profile.deleted`, `demographics.updated`, `wellness.updated`, `goals.updated`, `emergency_contact.created` / `.updated` / `.deleted`, `admin.profile_deactivated`, `admin.profile_reactivated` | The whole request rolls back (data **and** stored completion) and the API returns **503** `audit_unavailable` in the usual error shape. Nothing is saved, so the user can simply retry | These events record a **change to data**. A committed change with no audit row would be an unexplained gap in the history, so we refuse the change rather than lose the record |
+| **Best-effort**: `log_event()` | `admin.login`, `admin.login_failed`, `admin.logout`, `admin.profile_viewed`, and every `outcome=denied` write attempt | A warning is logged and the request carries on | Nothing changed, so there is no un-audited change to protect. Failing closed here would only lock people out (or hide a "denied" answer behind a 503) when the audit table has a problem |
+
+`record_event()` refuses to run outside a transaction, and `log_event()` writes inside its own savepoint so a failed
+best-effort insert can never break a surrounding transaction. Failure-injection tests in
+`tests/test_audit_durability.py` break the audit insert on purpose (including a real PostgreSQL rejection) and check
+that every required write, **profile deletion included**, rolls back completely with no audit row.
 
 ## Architecture decisions
 
@@ -470,7 +483,7 @@ Real secrets live only in `backend/.env`, which is **git-ignored** and never com
 
 ```bash
 cd backend
-python -m pytest        # 224 passed
+python -m pytest        # 237 passed
 ```
 
 | File | What it proves |
@@ -480,6 +493,7 @@ python -m pytest        # 224 passed
 | `test_profile_sections.py` | demographics and wellness: PUT replace vs PATCH, validation (future / ancient date of birth, bad choices, ranges), goals replaced atomically |
 | `test_emergency_contacts.py` | CRUD, max 3, primary rule, duplicate phone, **member A cannot read, edit or delete member B's contact (404)** |
 | `test_audit.py` | exactly one event per write, no secrets or values in any audit field, append-only, request id on every response and in the audit row, member activity |
+| `test_audit_durability.py` | failure injection: when the required audit insert fails, every member write, profile deletion and admin deactivate / reactivate returns 503 `audit_unavailable` and rolls back completely (data, stored completion, no audit row) |
 | `test_admin.py`, `test_admin_week2.py` | admin session list / search / detail, every filter and ordering, invalid values → 400, deactivate / reactivate with CSRF, login throttle, audit endpoints, **a member JWT gets 403 on every admin route and an admin session cannot use member routes** |
 | `test_sensitive_fields.py` | admin responses lack date of birth, allergies, lifestyle notes and full phones; no response anywhere contains password, token or session data |
 | `test_jwt.py`, `test_signup.py` | Week 1 auth: expiry, tampering, blacklisting, hashing, role injection ignored |

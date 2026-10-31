@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate, login, logout
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
@@ -17,7 +18,7 @@ from accounts.serializers import LoginSerializer, UserSerializer
 from accounts.views import InvalidCredentials
 from audit.models import AuditEvent
 from audit.serializers import AdminAuditEventSerializer
-from audit.services import log_event
+from audit.services import log_event, record_event
 from profiles.models import HealthProfile
 
 from .permissions import IsAdminRole
@@ -202,10 +203,11 @@ class _StatusChangeView(APIView):
     def post(self, request, pk):
         profile = get_object_or_404(_with_sections(HealthProfile.objects.all()), pk=pk)
         changed = profile.status != self.new_status
-        if changed:
-            profile.status = self.new_status
-            profile.save(update_fields=["status", "updated_at"])
-        log_event(request, self.action, target=profile, changed_fields=["status"] if changed else [])
+        with transaction.atomic():  # the status change and its required audit event commit together
+            if changed:
+                profile.status = self.new_status
+                profile.save(update_fields=["status", "updated_at"])
+            record_event(request, self.action, target=profile, changed_fields=["status"] if changed else [])
         return Response(AdminProfileDetailSerializer(profile).data)
 
 
