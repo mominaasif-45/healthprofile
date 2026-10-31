@@ -52,7 +52,7 @@ Week 2 (the assignment):
 | Database | PostgreSQL | Real `EXPLAIN` plans, partial unique indexes, DB-level constraints |
 | Frontend | Next.js (App Router) + TypeScript | Proxies `/api/*` to Django, so the browser sees one origin |
 | API docs | drf-spectacular (Swagger at `/api/docs/`) | Click-through, testable docs |
-| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 275 backend tests, 14 frontend tests |
+| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 275 backend tests, 24 frontend tests |
 
 ## Architecture
 
@@ -508,7 +508,7 @@ python -m pytest        # 275 passed
 
 ```bash
 cd frontend
-npm test                # 14 passed (Vitest + Testing Library, jsdom)
+npm test                # 24 passed (Vitest + Testing Library, jsdom)
 ```
 
 | File | What it proves |
@@ -516,6 +516,7 @@ npm test                # 14 passed (Vitest + Testing Library, jsdom)
 | `tests/ConfirmDialog.test.tsx` | the confirm dialog's keyboard behaviour: focus starts on Cancel (or on the type-to-confirm box), Tab / Shift+Tab stay inside, Escape closes but not while busy (focus then stays on the dialog box), focus returns to the opener, or to a fallback when the opener is gone or disabled |
 | `tests/admin-page.test.tsx` | where focus lands on the admin page after a deactivate or reactivate: the selected profile's heading if it is still listed, otherwise the "Member profiles" heading (e.g. when the Active filter loses its last match) |
 | `tests/contacts-card.test.tsx` | after deleting an emergency contact and reloading the list, focus lands on the "Emergency contacts" heading, not on the page body; editing the current primary shows the primary checkbox ticked, **disabled** and described by the hint; a non-primary contact's checkbox stays usable; an `is_primary` error from the server is shown under the checkbox |
+| `tests/validation.test.ts` | the contact form's phone check uses the server's rule: `1------`, `((((1))))`, letters and a `+` in the middle are rejected; 6 and 16 digits rejected; 7 and 15 digits accepted |
 | `tests/profile-page.test.tsx` | after deleting the whole profile, focus lands on the "Create your wellness profile" heading, not on the page body |
 
 ## API
@@ -700,7 +701,37 @@ Week 1 example (still valid): `POST /api/auth/user/login/` with `{ "email": "mom
 | `admin-audit.png` | `/admin/audit` with a filter applied |
 | `swagger-week2.png` | `/api/docs/` showing the *member profile*, *admin profiles* and *admin audit* groups |
 | `explain.png` | Terminal: `python manage.py explain_queries` after `seed_profiles --bulk 1000` |
-| `pytest-week2.png` | Terminal: `python -m pytest` → **224 passed** |
+| `pytest-week2.png` | Terminal: `python -m pytest` → **224 passed**. This is the original Week 2 run, before the review fixes; the final counts (275 backend, 24 frontend) and the tested commit are in [docs/evidence/week2-review.md](docs/evidence/week2-review.md) and the PR #3 conversation |
+
+## Review response (PR #3)
+
+Mentor review of PR #3 at `9784e4d`. Each code point was fixed in its own commit on this branch, with tests that fail
+on the previous commit and pass on the fix. Real output: [docs/evidence/week2-review.md](docs/evidence/week2-review.md).
+
+| Review point | What changed | Commit | Proof |
+|---|---|---|---|
+| **1. Audit durability** | The change, the completion update and the **required** audit event commit in one transaction; a failed required audit rolls everything back and returns 503 `audit_unavailable`. Logins, views and denied attempts stay best-effort (see "Required vs best-effort audit events") | `6a5633f` | `test_audit_durability.py`: failure injection for every member write, **profile deletion** and admin deactivate / reactivate, including a real PostgreSQL rejection |
+| **2. Phone normalisation** | One canonical form (`+` then 7–15 digits) before validation, storage and duplicate checks; data migration `0007`; CHECK constraint `0008` | `15f7b1b` | `test_phone_normalisation.py` (punctuation-heavy input, equivalent formats on POST and PATCH, fourth-contact limit, DB CHECK, migration); catalog diff shows no other constraint changed |
+| **3. Permission re-check after the lock** | Every profile change, member or admin, locks the profile row first and decides from that fresh row; a deactivation that committed while the request waited gives 403, and the `denied` event is written after the rollback so it is kept. The contact-limit lock is unchanged | `b8dd91a` | `test_concurrency.py`: PostgreSQL, two real connections, paused with events (no sleeps), 20 / 20 consecutive runs |
+| **4. Primary contact** | A profile with contacts always has exactly one primary: unsetting the current primary returns 400; the edit form locks that checkbox with a hint. *At most one* by the database, *at least one* by the service | `3c58e99` | `test_primary_contact.py` invariant test checks the rule after every step; `contacts-card.test.tsx` |
+| **5. Evidence and handoff** | Catalog check and a raw-SQL second primary rejected after the migrations (also on a database migrated from zero); overlap with Week 1 PR #2 checked by a throwaway merge (not merged); limits stated; final validation. Also: the frontend phone check now uses the server's rule (`40cb5ab`) | `40cb5ab` + this docs commit | `docs/evidence/week2-review.md`, [docs/ai-workflow.md](docs/ai-workflow.md) "Week 2 review response" |
+
+**Week 1 PR #2 overlap.** PR #2 is not merged. A throwaway merge into this branch gave 10 conflicts; in every one this
+branch already has its own later version of the same Week 1 fix, so each resolves to this branch's file, and the merged
+result passed every check (details in the evidence file). Two ways to finish, for the mentor to choose: merge PR #2
+into `main` first and then update PR #3 from `main` with that resolution, or close PR #2 as superseded by PR #3.
+
+**Loom points.** These are about the recording; the evidence to show is listed next to each.
+
+| Loom point | What to show | Where it is |
+|---|---|---|
+| 00:44–02:34 completion | The four 25% conditions (demographics, at least one contact, wellness preferences, at least one goal) and one section changing both its data and the stored completion | `test_four_sections_reach_100_complete`; `test_models_week2.py` completion rules; the stored completion rolling back in `test_audit_durability.py` |
+| 02:51–05:22 history vs masking | The member's activity stores field names only; the admin detail is an allow-list that shows some fields and masks others | `test_no_audit_field_contains_secrets_or_values`; `test_admin_detail_hides_sensitive_fields_and_masks_phones`; `adminpanel/serializers.py` |
+| 05:34–06:49 keyboard | Focus returning to the heading after the row disappears, and what the test asserts | `frontend/tests/admin-page.test.tsx`, `frontend/tests/contacts-card.test.tsx` |
+| 07:18–10:26 one request traced | serializer → `write_transaction` → `services._lock` (re-check) → `recalculate_completion` → `record_event`; the repaired database rule | `profiles/views.py`, `profiles/services.py`; evidence file §1 (second primary rejected) |
+| 10:34–11:39 auth | Access-token expiry separately from CSRF; a member request denied at an admin endpoint | `test_expired_access_token_returns_401`; `test_member_login_without_csrf_token_is_rejected_and_sets_no_cookies`; `test_member_jwt_gets_403_on_every_admin_route` |
+| 11:39–12:47 verification | Readable test summaries with the commands and the tested commit; the new audit-failure and concurrency checks; one prompt → reviewed diff → human correction | evidence file; [docs/ai-workflow.md](docs/ai-workflow.md) "Week 2 review response" |
+| Length over 13 minutes | One 5–10 minute walkthrough | Recording edit (not a code change) |
 
 ## AI workflow
 
@@ -717,8 +748,17 @@ Week 2: https://www.loom.com/share/5d16ef5c30ba4496a1de8ce16270edba
 ## Limitations
 
 * Intended for local development: set `DEBUG=False` and HTTPS for production (cookies then become `Secure`).
-* The audit log is append-only **in the application** (ORM guards and no API route). A database superuser with raw
-  SQL could still edit rows; database triggers or a write-only role would be the next hardening step.
+* **Audit append-only is application-level only.** The ORM guards (model `save()` / `delete()` and queryset
+  `update()` / `delete()` raise `AppendOnlyError`) and the lack of any API route protect the audit log from the
+  application's own code. They do **not** protect it from direct database access: raw SQL, `psql`, a superuser or a
+  migration can still update or delete audit rows (shown in the evidence file). Direct database access needs its own
+  restrictions, for example an application database role without `UPDATE` / `DELETE` on `audit_auditevent`, or triggers.
+* **"At least one primary contact" is enforced only in the service** (under the profile row lock). The database enforces
+  "at most one" (partial unique index), but a raw SQL `UPDATE` can still leave a profile with contacts and no primary.
+* **Phone numbers have no country rules** (that would need a new dependency): `0300 1234567` and `+92 300 1234567`, or
+  `92…` and `+92…`, count as different numbers.
+* **Required audit events fail closed**: if the audit table cannot be written, member edits and admin status changes
+  are refused with 503 `audit_unavailable` until it can.
 * Admin login shares the member login throttle (5 per minute per IP), so the two portals share one attempt budget.
 * The "Renews in N min" label is an estimate from when the page last saw a login or refresh, because the token
   cookies are HttpOnly and cannot be read by JavaScript.
