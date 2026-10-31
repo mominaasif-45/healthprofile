@@ -470,6 +470,20 @@ Good plan. Answers: 1 best F1 on validation. 2 no, skip the age_band experiment;
 ```
 </details>
 
+<details><summary>8. Phase 3 approval, log correction and Phase 4 plan request (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Commit Phase 3 with your proposed message, don't push, and show me the commit hash. Log correction: yes, my Phase 3 'go' message was drafted with help from Claude in a separate chat, and the 0.03 leakage-margin idea was suggested by Claude in that chat; I reviewed and approved it. Please log it that way and not as my own decision. Then bring me the Phase 4 plan (pipeline artifact and reproducible training script), and wait for my 'go'. In the plan, explain: what exactly goes into the artifact file and its metadata; how the SHA-256 check works before loading; what 'reproduces' means (same predictions? same file bytes?) and how we test it; and the security note about joblib files being pickles.
+```
+</details>
+
+<details><summary>9. Phase 4 decision (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Answers: 1 yes, add .gitattributes with *.joblib binary. 2 ship the model fitted on the training rows only; note in the README that a production system would refit on all the data and re-derive the threshold. 3 yes, my last message (the Phase 3 commit, the log correction and the Phase 4 plan request) was drafted with help from Claude in a separate chat; please log it. Go. Tests first, shown failing then passing. Show the byte-identity result, run the full suite, explain in plain words, and don't commit until I approve.
+```
+</details>
+
 ### My decisions and corrections
 
 | Phase | Options I was given | What I decided or added |
@@ -478,6 +492,7 @@ Good plan. Answers: 1 best F1 on validation. 2 no, skip the age_band experiment;
 | 1 Data | Columns, blank rates, default noise as proposed; after the run: keep noise 1.0 (ceiling 0.657 ROC-AUC) or strengthen the rule | Approved; added: the data card must say the group differences in the rule are arbitrary and not claims about real people, and the "best possible score" must be explained in plain words. After the report: **kept noise at 1.0** |
 | 2 Split and analysis | 70 / 15 / 15 stratified split; median + "was blank" column for numbers, `missing` category for blanks; `hour` as a category; analysis on the training pile only | Approved as proposed; asked again for tests first with fail-then-pass proof |
 | 3 Models | Threshold: best F1 or "at least 60% recall, best precision"; an extra model without `age_band` | **Best F1**; **skipped** the `age_band` experiment (README future work, Phase 7). **Changed the leakage alarm**: the plan alarmed at the pile's ceiling itself. The idea of a margin (an honest model can beat a ceiling measured on the same finite pile by luck, so alarm only above the ceiling **+ 0.03** or above 0.90) was **suggested by Claude in the separate chat**; I reviewed and approved it, and asked for the margin to be explained in the report. Asked for the slow retraining test to be skippable with a flag but run by default |
+| 4 Artifact | Add `.gitattributes` (`*.joblib binary`, outside the approved file list); ship the model fitted on training rows only, or refit on training + validation | Approved `.gitattributes`; **training rows only**, so the shipped file is exactly the one the report describes; added: the README must say a production system would refit on all the data and re-derive the threshold |
 
 ### What the checks caught
 
@@ -509,3 +524,12 @@ Good plan. Answers: 1 best F1 on validation. 2 no, skip the age_band experiment;
   columns tells them apart" became "little").
 - **Phase 3, speed.** The full experiment takes about 40 seconds; `ML_SKIP_SLOW=1` skips the 5 tests that need it
   (they run by default).
+- **Phase 4, byte-identity.** A second, independent `python -m ml.train --check` run rebuilt the model with the same
+  SHA-256 (`d69f7723…`), a largest probability difference of 0.0 and identical metadata. Byte-identity is reported
+  but not required by the tests, because a pickle may store the same model differently on another platform.
+- **Phase 4, the checks checked.** Three deliberate breaks were each caught: unpickling before the checksum
+  comparison (the `joblib.load` trap fired), skipping the scikit-learn version check, and a `--check` that always
+  reported matching predictions.
+- **Phase 4, the human step.** After the first training run, the new checksum was pasted into `EXPECTED_SHA256` in
+  `ml/artifact.py`; this is the reviewed code change that accepts a model file. I checked that line myself against
+  PowerShell's `Get-FileHash` on the `.joblib` file, and it matches.

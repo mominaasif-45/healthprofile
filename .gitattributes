@@ -1,0 +1,2 @@
+# The model artifact is a binary pickle: never convert line endings (it would break its SHA-256).
+*.joblib binary

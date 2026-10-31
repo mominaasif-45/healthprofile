@@ -50,6 +50,11 @@ def _learned_vs_rule(model):
 
 def run(frame):
     """The whole experiment on `frame` (the committed dataset). Raises LeakageAlarm on a too-good score."""
+    return fit_and_evaluate(frame)[0]
+
+
+def fit_and_evaluate(frame):
+    """Like run(), but also returns the fitted pipelines (name -> Pipeline) so ml.train can save the chosen one."""
     _, true_score = gen.simulate(gen.DEFAULT_SEED, gen.DEFAULT_ROWS, gen.DEFAULT_NOISE)
     if len(frame) != len(true_score):
         raise ValueError("The experiment expects the committed dataset (seed 42, 6000 rows, noise 1.0).")
@@ -91,7 +96,7 @@ def run(frame):
         evaluate.check_leakage(ranking["roc_auc"], ceilings["test"], "test", name)
         test[name] = {**ranking, **evaluate.threshold_metrics(y["test"], p_test[name], validation[name]["threshold"])}
 
-    return _rounded({
+    results = _rounded({
         "settings": {
             "split_seed": features.SPLIT_SEED, "model_seed": models.SEED, "cv_folds": models.CV_FOLDS,
             "bootstrap_rounds": evaluate.BOOTSTRAP_ROUNDS, "leakage_margin": evaluate.LEAKAGE_MARGIN,
@@ -121,6 +126,7 @@ def run(frame):
         },
         "learned_vs_rule": _learned_vs_rule(fitted["logistic_regression"]),
     })
+    return results, fitted
 
 
 # ---------------------------------------------------------------- the report
