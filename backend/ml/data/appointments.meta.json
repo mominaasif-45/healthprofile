@@ -1,0 +1,33 @@
+{
+  "description": "Synthetic appointment no-show dataset. Invented by a seeded script; no real people.",
+  "generator": "ml.data.generate",
+  "command": "python -m ml.data.generate --seed 42 --rows 6000 --noise 1.0",
+  "seed": 42,
+  "rows": 6000,
+  "noise": 1.0,
+  "columns": [
+    "appointment_id",
+    "lead_time_days",
+    "weekday",
+    "hour",
+    "visit_type",
+    "booking_channel",
+    "reminder_sent",
+    "prior_visits",
+    "prior_no_shows",
+    "distance_band",
+    "age_band",
+    "no_show"
+  ],
+  "no_show_rate": 0.208,
+  "missing_rate": {
+    "reminder_sent": 0.061,
+    "prior_visits": 0.03,
+    "prior_no_shows": 0.03,
+    "distance_band": 0.079,
+    "age_band": 0.04
+  },
+  "best_possible_roc_auc": 0.6568,
+  "content_sha256": "76cd61d77485faf77c2a6c1b8ecc6e512eca7a204d769adcb462ae122b0afa3f",
+  "content_sha256_note": "SHA-256 of the CSV text with line endings normalised to \\n."
+}
