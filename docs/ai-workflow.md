@@ -442,12 +442,27 @@ go. One addition: in the data card, state clearly that the age-band, channel and
 ```
 </details>
 
+<details><summary>4. Phase 1 approval and Phase 2 plan request (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Good report. Keep noise at 1.0. Yes, my Phase 1 'go' message was also drafted with help from Claude in a separate chat; please mark it that way in the log. Commit Phase 1 with your proposed message, don't push, and show me the commit hash. Then bring me the Phase 2 plan (analysis, missing values and split) and wait for my 'go'.
+```
+</details>
+
+<details><summary>5. Phase 2 decision (drafted with help from Claude in a separate chat)</summary>
+
+```text
+go. Yes, my last message (the Phase 1 approval and Phase 2 plan request) was also drafted with help from Claude in a separate chat; please mark it that way in the log. Write the tests first, show them failing, then passing. Run the full suite, show git diff --stat and a plain-language report, and don't commit until I approve.
+```
+</details>
+
 ### My decisions and corrections
 
 | Phase | Options I was given | What I decided or added |
 |---|---|---|
 | 0 Plan | New dependencies; who may call the endpoint; commits vs `CLAUDE.md`'s "do not commit"; files outside the new `ml/` app; committing the data and model; card placement | Approved scikit-learn, numpy, pandas, joblib with exact pins and no matplotlib / Jupyter; members only, throttled; one commit per phase after my approval, never push; approved the file list; commit data and model, **with a SHA-256 check before loading the pickle** and a README explanation (my addition); card on `/profile` below the wellness card; added an adjustable noise level and per-group metrics |
 | 1 Data | Columns, blank rates, default noise as proposed; after the run: keep noise 1.0 (ceiling 0.657 ROC-AUC) or strengthen the rule | Approved; added: the data card must say the group differences in the rule are arbitrary and not claims about real people, and the "best possible score" must be explained in plain words. After the report: **kept noise at 1.0** |
+| 2 Split and analysis | 70 / 15 / 15 stratified split; median + "was blank" column for numbers, `missing` category for blanks; `hour` as a category; analysis on the training pile only | Approved as proposed; asked again for tests first with fail-then-pass proof |
 
 ### What the checks caught
 
@@ -459,3 +474,10 @@ go. One addition: in the data card, state clearly that the age-band, channel and
   endings normalised, and a test proves CRLF and LF give the same checksum.
 - **Phase 1, the noise ceiling.** The best possible ROC-AUC at noise 0 (0.671) and 0.5 (0.672) are within measurement
   wobble, so the test checks only the clear trend (0 > 1 > 3), and the data card says so.
+- **Phase 2, tests that had never failed.** All 13 new tests passed on their first run, which proves little on its own. So
+  Claude Code broke the code on purpose twice: making the analysis read the whole file instead of the training pile
+  (3 tests failed), and letting a feature (lead time) influence the split (2 tests failed). The original code was then
+  restored and all 13 passed again.
+- **Phase 2, a wrong table order.** Reading the generated report showed the no-show-rate tables in a jumbled order (the
+  grouping followed row order, not category order). The numbers were right; the order was fixed, and the "committed
+  report matches the script" test caught the stale file until it was regenerated.
