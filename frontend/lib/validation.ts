@@ -3,10 +3,20 @@
 
 export type Errors = Record<string, string>;
 
-const PHONE = /^\+?[0-9][0-9 ()\-]{6,23}$/;
+// Same phone rule as the server (backend/profiles/phones.py): an optional leading "+", then digits,
+// spaces, brackets and dashes, with 7 to 15 digits in total. "1------" (1 digit) is not a number.
+const PHONE_ALLOWED = /^\+?[0-9 ()\-]+$/;
+const PHONE_MIN_DIGITS = 7;
+const PHONE_MAX_DIGITS = 15;
+const PHONE_MESSAGE = `Enter a valid phone number with ${PHONE_MIN_DIGITS} to ${PHONE_MAX_DIGITS} digits, e.g. +92 300 0000000.`;
 const MAX_AGE_YEARS = 120;
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
+
+function isValidPhone(value: string) {
+  const digits = value.replace(/\D/g, "").length;
+  return PHONE_ALLOWED.test(value) && digits >= PHONE_MIN_DIGITS && digits <= PHONE_MAX_DIGITS;
+}
 
 export function validateDemographics(f: {
   full_name: string;
@@ -35,7 +45,7 @@ export function validateContact(f: { name: string; relationship: string; phone: 
   const e: Errors = {};
   if (f.name.trim().length < 2) e.name = "Name must be at least 2 characters.";
   if (!f.relationship) e.relationship = "Choose a relationship.";
-  if (!PHONE.test(f.phone.trim())) e.phone = "Enter a valid phone number, e.g. +92 300 0000000.";
+  if (!isValidPhone(f.phone.trim())) e.phone = PHONE_MESSAGE;
   return e;
 }
 
