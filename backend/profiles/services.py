@@ -17,6 +17,7 @@ from .models import (
     WellnessGoal,
     WellnessPreference,
 )
+from .phones import normalize_phone
 
 MAX_CONTACTS = 3
 SECTION_WEIGHT = 25  # 4 sections x 25% = 100%
@@ -77,6 +78,16 @@ def missing_sections(profile):
 def _changed(instance, values):
     """Names of the fields whose value actually differs. Returns names only, never values."""
     return sorted(name for name, value in values.items() if getattr(instance, name) != value)
+
+
+def _with_canonical_phone(data):
+    """Normalise data["phone"] (if sent) so duplicates are found whatever the formatting."""
+    if "phone" not in data:
+        return data
+    try:
+        return {**data, "phone": normalize_phone(data["phone"])}
+    except ValueError as exc:
+        raise ValidationError({"phone": [str(exc)]}) from exc
 
 
 def _lock(profile):
@@ -156,6 +167,7 @@ def save_wellness(profile, data, replace):
 # ---------------------------------------------------------------- emergency contacts
 @transaction.atomic
 def create_contact(profile, data):
+    data = _with_canonical_phone(data)
     _lock(profile)
     contacts = EmergencyContact.objects.filter(profile=profile)
     if contacts.count() >= MAX_CONTACTS:
@@ -173,6 +185,7 @@ def create_contact(profile, data):
 
 @transaction.atomic
 def update_contact(contact, data):
+    data = _with_canonical_phone(data)
     profile = _lock(contact.profile)
     contacts = EmergencyContact.objects.filter(profile=profile)
     contact = contacts.get(pk=contact.pk)

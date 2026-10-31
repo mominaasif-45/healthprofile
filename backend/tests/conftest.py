@@ -68,7 +68,7 @@ def make_profile(user, full_name=None, status="active", sections=("demographics"
         )
     if "contact" in sections:
         EmergencyContact.objects.create(
-            profile=profile, name="Sana Ahmed", relationship="sibling", phone="+92 300 1234567", is_primary=True
+            profile=profile, name="Sana Ahmed", relationship="sibling", phone="+923001234567", is_primary=True
         )
     preference = None
     if "wellness" in sections or "goal" in sections:

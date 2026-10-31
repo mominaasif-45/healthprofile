@@ -69,7 +69,7 @@ def test_member_still_sees_their_own_full_data(client, user, profile):
     data = client.get("/api/profiles/me/").data
     assert data["wellness"]["allergies"] == "Peanuts" and data["wellness"]["lifestyle_notes"] == "Secret note"
     assert data["demographics"]["date_of_birth"] == "1995-06-15"
-    assert data["emergency_contacts"][0]["phone"] == "+92 300 1234567"
+    assert data["emergency_contacts"][0]["phone"] == "+923001234567"
 
 
 @pytest.mark.django_db

@@ -26,21 +26,21 @@ def test_duplicate_goal_is_rejected(profile):
 @pytest.mark.django_db
 def test_same_phone_twice_in_one_profile_is_rejected(profile):
     with pytest.raises(IntegrityError), transaction.atomic():
-        EmergencyContact.objects.create(profile=profile, name="Other", relationship="friend", phone="+92 300 1234567")
+        EmergencyContact.objects.create(profile=profile, name="Other", relationship="friend", phone="+923001234567")
 
 
 @pytest.mark.django_db
 def test_same_phone_is_allowed_on_different_profiles(profile, other_user):
     second = make_profile(other_user, sections=())
-    EmergencyContact.objects.create(profile=second, name="Sana", relationship="friend", phone="+92 300 1234567")
-    assert EmergencyContact.objects.filter(phone="+92 300 1234567").count() == 2
+    EmergencyContact.objects.create(profile=second, name="Sana", relationship="friend", phone="+923001234567")
+    assert EmergencyContact.objects.filter(phone="+923001234567").count() == 2
 
 
 @pytest.mark.django_db
 def test_two_primary_contacts_are_rejected(profile):
     with pytest.raises(IntegrityError), transaction.atomic():
         EmergencyContact.objects.create(
-            profile=profile, name="Second", relationship="friend", phone="+92 300 7654321", is_primary=True
+            profile=profile, name="Second", relationship="friend", phone="+923007654321", is_primary=True
         )
 
 
@@ -142,7 +142,7 @@ def test_week1_rows_are_copied_into_the_new_tables(user):
         assert profile.demographics.full_name == "Momina Asif"
         assert profile.demographics.age_range == "25-34"
         contact = profile.emergency_contacts.get()
-        assert (contact.name, contact.phone, contact.is_primary) == ("Bilal Ahmed", "+92 300 0000000", True)
+        assert (contact.name, contact.phone, contact.is_primary) == ("Bilal Ahmed", "+923000000000", True)  # normalised by migration 0007
         assert profile.wellness.contact_preference == "phone"
         assert profile.wellness.allergies == "Peanuts"
         assert sorted(profile.wellness.goal_codes) == ["better_sleep", "stress_management"]  # unknown label skipped

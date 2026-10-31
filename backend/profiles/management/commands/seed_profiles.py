@@ -36,13 +36,13 @@ SECTIONS = ("demographics", "contact", "wellness", "goals")
 # name, email, sections filled, status, age_range, date_of_birth, contact (name, relationship, phone), days ago created
 DEMO = [
     ("Momina Asif", "momina.asif@example.com", SECTIONS, "active", "25-34", None,
-     ("Bilal Ahmed", "sibling", "+92 300 0000001"), 2),
+     ("Bilal Ahmed", "sibling", "+923000000001"), 2),
     ("Bilal Ahmed", "bilal.ahmed@example.com", ("demographics", "contact", "wellness"), "active", "35-44", None,
-     ("Sana Ahmed", "partner", "+92 300 0000002"), 3),
+     ("Sana Ahmed", "partner", "+923000000002"), 3),
     ("Sara Noor", "sara.noor@example.com", ("demographics", "wellness", "goals"), "active", None, "2004-03-12",
      None, 4),
     ("Hamza Malik", "hamza.malik@example.com", SECTIONS, "deactivated", "45-54", None,
-     ("Iqra Malik", "parent", "+92 300 0000004"), 5),
+     ("Iqra Malik", "parent", "+923000000004"), 5),
     ("Zainab Iqbal", "zainab.iqbal@example.com", (), "active", None, None, None, 7),
 ]
 
@@ -198,7 +198,7 @@ class Command(BaseCommand):
             if "contact" in sections:
                 contacts.append(EmergencyContact(
                     profile=profile, name=fake.name(), relationship=rng.choice(EmergencyContact.Relationship.values),
-                    phone=f"+92 300 {rng.randint(1000000, 9999999)}", is_primary=True,
+                    phone=f"+92300{rng.randint(1000000, 9999999)}", is_primary=True,
                 ))
             if "wellness" in sections:
                 preferences.append(WellnessPreference(

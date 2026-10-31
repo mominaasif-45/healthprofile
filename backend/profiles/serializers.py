@@ -1,4 +1,3 @@
-import re
 from datetime import date
 
 from django.utils import timezone
@@ -7,9 +6,8 @@ from rest_framework import serializers
 
 from . import services
 from .models import Demographics, EmergencyContact, HealthProfile, WellnessGoal, WellnessPreference
+from .phones import normalize_phone
 
-# Fictional phone numbers only: optional +, then digits with spaces, dashes or brackets.
-PHONE_PATTERN = re.compile(r"^\+?[0-9][0-9 ()\-]{6,23}$")
 MAX_AGE_YEARS = 120
 
 
@@ -106,10 +104,11 @@ class EmergencyContactSerializer(serializers.ModelSerializer):
         return value
 
     def validate_phone(self, value):
-        value = value.strip()
-        if not PHONE_PATTERN.match(value):
-            raise serializers.ValidationError("Enter a valid phone number, e.g. +92 300 0000000.")
-        return value
+        # Fictional numbers only. Returns the canonical form ("+923000000000"), which is what is stored.
+        try:
+            return normalize_phone(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
 
 
 class CompletionSerializer(serializers.Serializer):

@@ -38,7 +38,7 @@ Week 2 (the assignment):
 - [x] **Sensitive fields hidden** from admin responses (date of birth, allergies, lifestyle notes; phones masked)
 - [x] **Foreign keys, unique constraints and composite indexes** justified by real queries, with `EXPLAIN (ANALYZE, BUFFERS)` evidence
 - [x] **Admin reactivate** and per-profile **history** endpoint
-- [x] **Role-boundary tests**: 237 backend tests, including every route checked for member / admin / signed-out access
+- [x] **Role-boundary tests**: 262 backend tests, including every route checked for member / admin / signed-out access
 - [x] **Migrations** with a data migration that moves existing Week 1 data into the new tables
 - [x] Updated **Swagger** (tags, descriptions, examples), README, `CLAUDE.md` project rules
 
@@ -52,7 +52,7 @@ Week 2 (the assignment):
 | Database | PostgreSQL | Real `EXPLAIN` plans, partial unique indexes, DB-level constraints |
 | Frontend | Next.js (App Router) + TypeScript | Proxies `/api/*` to Django, so the browser sees one origin |
 | API docs | drf-spectacular (Swagger at `/api/docs/`) | Click-through, testable docs |
-| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 237 backend tests, 11 frontend tests |
+| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 262 backend tests, 11 frontend tests |
 
 ## Architecture
 
@@ -119,6 +119,7 @@ that every required write, **profile deletion included**, rolls back completely 
 | **Contact events target the owning profile** (`target_type="health_profile"`) | One indexed lookup returns the whole history of a profile, including deleted contacts | The contact's own id is not in the log |
 | **Admin responses use separate allow-list serializers** | A new column can never leak to admins by accident; masking is tested | Two serializer sets to maintain |
 | **Max 3 contacts and "one primary" enforced in the service under a row lock**, with a partial unique index as backstop | Friendly 400 errors, race-safe, and the database refuses a violation even if code is bypassed | Rules live in two places (documented and tested) |
+| **Phones stored in one canonical form**: optional `+` then **7–15 digits** (`"+92 (300) 123-4567"` → `"+923001234567"`), normalised by `profiles/phones.py` before validation, storage and the duplicate check; CHECK constraint `contact_phone_is_canonical` as backstop | Punctuation can no longer hide a non-number (`1------` is rejected) or a duplicate (`+92-300-123-4567` = `+92 300 1234567`), and the `(profile, phone)` unique constraint now catches equivalent formats too | No country rules without a new dependency: `0300 1234567` and `+92 300 1234567` (or `92…` and `+92…`) are still different numbers. Members see the compact canonical form |
 | **Deactivated profile is read-only** (403 + a `denied` audit event) | Admins can freeze a profile without deleting data | Owner cannot fix their data until reactivated |
 | **Drop Django's redundant single-column FK indexes** where a composite or unique index already starts with that column | Fewer indexes to maintain on writes; the justified index is the one Postgres uses | See "Lessons" below: Django also dropped a partial unique index by mistake, repaired in migration 0006 |
 | **Admin login shares the member login throttle** (5/min per IP) | Same brute-force protection, no extra config | One shared budget per IP |
@@ -228,6 +229,8 @@ range; sleep goal between 4 and 12; lower-case unique email; valid role / status
 | `profiles/0004_remove_old_profile_columns` | drops the old columns and constraints |
 | `profiles/0005_drop_redundant_fk_indexes` | removes automatic FK indexes that a composite / unique index already covers |
 | `profiles/0006_restore_one_primary_contact_constraint` | **repair** for 0005 (see Lessons) |
+| `profiles/0007_normalize_contact_phones` | **data**: rewrites stored phones into canonical form. Checks first and stops (changing nothing, naming contact ids only) if a row is not 7–15 digits or two contacts on one profile would become the same number |
+| `profiles/0008_contact_phone_is_canonical` | adds the CHECK constraint `contact_phone_is_canonical` (one `ADD CONSTRAINT`, nothing dropped) |
 | `audit/0001_initial`, `audit/0002_drop_redundant_fk_indexes` | the audit table with its two composite indexes |
 
 `manage.py migrate` works on an empty database and on a Week 1 database (checked against the real Week 1 data
@@ -483,7 +486,7 @@ Real secrets live only in `backend/.env`, which is **git-ignored** and never com
 
 ```bash
 cd backend
-python -m pytest        # 237 passed
+python -m pytest        # 262 passed
 ```
 
 | File | What it proves |
@@ -492,6 +495,7 @@ python -m pytest        # 237 passed
 | `test_profiles.py` | 401 on every member route, own-data-only, 409 on a second profile, profile `DELETE`, deactivated profile = read-only (403 + audited), CSRF required on every write |
 | `test_profile_sections.py` | demographics and wellness: PUT replace vs PATCH, validation (future / ancient date of birth, bad choices, ranges), goals replaced atomically |
 | `test_emergency_contacts.py` | CRUD, max 3, primary rule, duplicate phone, **member A cannot read, edit or delete member B's contact (404)** |
+| `test_phone_normalisation.py` | punctuation-heavy input (`1------`), the 7 / 15 digit boundaries, canonical storage, equivalent formats as duplicates on POST and PATCH, the fourth-contact limit in any format, the database CHECK, and migration 0007 (rewrites rows; stops on unsafe rows naming ids only) |
 | `test_audit.py` | exactly one event per write, no secrets or values in any audit field, append-only, request id on every response and in the audit row, member activity |
 | `test_audit_durability.py` | failure injection: when the required audit insert fails, every member write, profile deletion and admin deactivate / reactivate returns 503 `audit_unavailable` and rolls back completely (data, stored completion, no audit row) |
 | `test_admin.py`, `test_admin_week2.py` | admin session list / search / detail, every filter and ordering, invalid values → 400, deactivate / reactivate with CSRF, login throttle, audit endpoints, **a member JWT gets 403 on every admin route and an admin session cannot use member routes** |

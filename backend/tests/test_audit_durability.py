@@ -101,7 +101,7 @@ def test_failed_audit_rolls_back_contact_update(me, half_profile, monkeypatch):
 @DURABLE
 def test_failed_audit_rolls_back_contact_delete_and_primary_promotion(me, half_profile, monkeypatch):
     first = EmergencyContact.objects.get(profile=half_profile)
-    EmergencyContact.objects.create(profile=half_profile, name="Ali Raza", relationship="friend", phone="+92 322 4445556")
+    EmergencyContact.objects.create(profile=half_profile, name="Ali Raza", relationship="friend", phone="+923224445556")
     before = snapshot(half_profile)
     fail_audit(monkeypatch)
 

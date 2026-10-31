@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.db.models import F, Q
 
+from .phones import CANONICAL as CANONICAL_PHONE
+
 
 class HealthProfile(models.Model):
     """
@@ -122,8 +124,11 @@ class EmergencyContact(models.Model):
 
     class Meta:
         constraints = [
-            # The same number cannot be added twice to one profile.
+            # The same number cannot be added twice to one profile. Phones are stored in canonical
+            # form (constraint below), so this also catches the same number typed differently.
             models.UniqueConstraint(fields=["profile", "phone"], name="contact_unique_phone_per_profile"),
+            # Canonical form only: optional "+" then 7 to 15 digits (see profiles/phones.py).
+            models.CheckConstraint(condition=Q(phone__regex=CANONICAL_PHONE), name="contact_phone_is_canonical"),
             # At most one primary contact per profile (partial unique index).
             models.UniqueConstraint(
                 fields=["profile"], condition=Q(is_primary=True), name="contact_one_primary_per_profile"
