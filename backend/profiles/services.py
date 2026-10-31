@@ -28,6 +28,7 @@ class ProfileDeactivated(Exception):
 
 
 MAX_CONTACTS = 3
+PRIMARY_REQUIRED = 'You need a primary contact. To change it, choose "Make primary" on another contact.'
 SECTION_WEIGHT = 25  # 4 sections x 25% = 100%
 
 # Defaults used when a PUT omits an optional field (PUT replaces the whole section).
@@ -213,6 +214,12 @@ def update_contact(contact, data):
     contact = contacts.get(pk=contact.pk)
     if "phone" in data and contacts.exclude(pk=contact.pk).filter(phone=data["phone"]).exists():
         raise ValidationError({"phone": ["This phone number is already saved on your profile."]})
+
+    # "At least one primary" lives here (the database can only enforce "at most one"): the current
+    # primary cannot be unset. The member moves it by choosing "Make primary" on another contact,
+    # which unsets this one in the same locked transaction (below).
+    if contact.is_primary and data.get("is_primary") is False:
+        raise ValidationError({"is_primary": [PRIMARY_REQUIRED]})
 
     changed = _changed(contact, data)
     if data.get("is_primary"):

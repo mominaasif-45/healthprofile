@@ -87,6 +87,10 @@ export function ContactsCard({
   }
 
   const full = contacts.length >= MAX_CONTACTS;
+  // The backend refuses to unset the current primary (a profile with contacts always has one),
+  // so the box is locked while editing it; the primary moves with "Make primary" on another contact.
+  const editingPrimary = editing !== null && editing !== "new" && contacts.some((c) => c.id === editing && c.is_primary);
+  const primaryDescribedBy = [editingPrimary && "c-primary-hint", errors.is_primary && "c-primary-error"].filter(Boolean).join(" ") || undefined;
 
   return (
     <section className="card" id="contacts" aria-labelledby="contacts-title">
@@ -162,10 +166,27 @@ export function ContactsCard({
           <Field label="Phone (fictional)" id="c-phone" error={errors.phone}>
             <input id="c-phone" type="tel" className="input" placeholder="+92 300 0000000" value={form.phone} onChange={(e) => set("phone", e.target.value)} aria-invalid={!!errors.phone} />
           </Field>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-            <input type="checkbox" checked={form.is_primary} onChange={(e) => set("is_primary", e.target.checked)} />
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: editingPrimary || errors.is_primary ? 4 : 12 }}>
+            <input
+              type="checkbox"
+              checked={form.is_primary}
+              disabled={editingPrimary}
+              onChange={(e) => set("is_primary", e.target.checked)}
+              aria-describedby={primaryDescribedBy}
+              aria-invalid={!!errors.is_primary}
+            />
             Make this my primary contact
           </label>
+          {editingPrimary && (
+            <p id="c-primary-hint" className="hint" style={{ marginTop: 0 }}>
+              {'To change your primary contact, use "Make primary" on another contact.'}
+            </p>
+          )}
+          {errors.is_primary && (
+            <p id="c-primary-error" className="error-text" role="alert" style={{ marginTop: 0 }}>
+              {errors.is_primary}
+            </p>
+          )}
           <div className="section-foot">
             <button className="btn" onClick={() => setEditing(null)} disabled={busy}>
               Cancel

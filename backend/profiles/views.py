@@ -279,6 +279,9 @@ class ContactDetailView(MemberView):
 
     @extend_schema(
         tags=TAG, summary="Change an emergency contact",
+        description="Send only the fields to change. A profile with contacts always has exactly one "
+                    "primary: is_primary=true moves the primary here, and is_primary=false on the current "
+                    "primary returns 400 (choose another contact as primary instead).",
         request=EmergencyContactSerializer, responses={200: EmergencyContactSerializer},
         examples=[OpenApiExample("Make primary", request_only=True, value={"is_primary": True})],
     )
