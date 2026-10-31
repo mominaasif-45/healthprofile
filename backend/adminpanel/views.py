@@ -201,13 +201,18 @@ class _StatusChangeView(APIView):
     action = None
 
     def post(self, request, pk):
-        profile = get_object_or_404(_with_sections(HealthProfile.objects.all()), pk=pk)
-        changed = profile.status != self.new_status
         with transaction.atomic():  # the status change and its required audit event commit together
+            # Same locking policy as member writes (profiles/services._lock): lock the profile row
+            # first and decide from that fresh row, so a concurrent member write or a second admin
+            # is serialised and "changed" is never based on a stale read. The row is locked on its
+            # own: PostgreSQL cannot lock the optional section rows of a LEFT JOIN.
+            profile = get_object_or_404(HealthProfile.objects.select_for_update(), pk=pk)
+            changed = profile.status != self.new_status
             if changed:
                 profile.status = self.new_status
                 profile.save(update_fields=["status", "updated_at"])
             record_event(request, self.action, target=profile, changed_fields=["status"] if changed else [])
+        profile = _with_sections(HealthProfile.objects.all()).get(pk=pk)
         return Response(AdminProfileDetailSerializer(profile).data)
 
 

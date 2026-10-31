@@ -5,6 +5,10 @@ Views stay thin: they authenticate, validate with a serializer, call one functio
 from here, then write one audit event. Every function that changes data runs inside
 a transaction and ends with recalculate_completion(), so the stored completion
 numbers can never drift from the real data.
+
+Locking policy: every function that changes a profile starts with _lock(), which locks the
+profile row and re-checks, on that fresh row, that the profile is still active. Admin
+deactivate / reactivate take the same row lock, so the two can never interleave.
 """
 from django.db import transaction
 from django.utils import timezone
@@ -18,6 +22,10 @@ from .models import (
     WellnessPreference,
 )
 from .phones import normalize_phone
+
+class ProfileDeactivated(Exception):
+    """The profile was not active when its row lock was taken, so the write must not happen."""
+
 
 MAX_CONTACTS = 3
 SECTION_WEIGHT = 25  # 4 sections x 25% = 100%
@@ -91,8 +99,15 @@ def _with_canonical_phone(data):
 
 
 def _lock(profile):
-    """Serialise concurrent writes to one profile (row lock, held until the transaction ends)."""
-    return HealthProfile.objects.select_for_update().get(pk=profile.pk)
+    """
+    Lock the profile row (held until the transaction ends) and return the locked, fresh row.
+    If another transaction held the lock, PostgreSQL re-reads the row once it is released, so a
+    deactivation that committed while this request waited is seen here and the write is refused.
+    """
+    locked = HealthProfile.objects.select_for_update().get(pk=profile.pk)
+    if locked.status != HealthProfile.Status.ACTIVE:
+        raise ProfileDeactivated()
+    return locked
 
 
 # ---------------------------------------------------------------- demographics
@@ -103,7 +118,7 @@ def save_demographics(profile, data, replace):
     replace=False -> PATCH: change only the fields that were sent (section must already exist).
     Returns (demographics, changed_field_names).
     """
-    _lock(profile)
+    profile = _lock(profile)
     existing = Demographics.objects.filter(profile=profile).first()
     if replace:
         values = {**DEMOGRAPHICS_DEFAULTS, **data}
@@ -131,7 +146,7 @@ def save_wellness(profile, data, replace):
     Save the wellness preference and its goals. Goals arrive as a list of codes and are
     replaced atomically (same transaction as the preference). Returns (preference, changed_names).
     """
-    _lock(profile)
+    profile = _lock(profile)
     data = dict(data)
     goals = data.pop("goal_codes", None)
     existing = WellnessPreference.objects.filter(profile=profile).first()
@@ -164,11 +179,18 @@ def save_wellness(profile, data, replace):
     return instance, sorted(changed)
 
 
+# ---------------------------------------------------------------- root profile
+@transaction.atomic
+def delete_profile(profile):
+    """Delete the profile and (by cascade) every section, under the same lock and status re-check."""
+    _lock(profile).delete()
+
+
 # ---------------------------------------------------------------- emergency contacts
 @transaction.atomic
 def create_contact(profile, data):
     data = _with_canonical_phone(data)
-    _lock(profile)
+    profile = _lock(profile)
     contacts = EmergencyContact.objects.filter(profile=profile)
     if contacts.count() >= MAX_CONTACTS:
         raise ValidationError({"emergency_contacts": [f"You can save at most {MAX_CONTACTS} emergency contacts."]})

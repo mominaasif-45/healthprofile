@@ -38,7 +38,7 @@ Week 2 (the assignment):
 - [x] **Sensitive fields hidden** from admin responses (date of birth, allergies, lifestyle notes; phones masked)
 - [x] **Foreign keys, unique constraints and composite indexes** justified by real queries, with `EXPLAIN (ANALYZE, BUFFERS)` evidence
 - [x] **Admin reactivate** and per-profile **history** endpoint
-- [x] **Role-boundary tests**: 262 backend tests, including every route checked for member / admin / signed-out access
+- [x] **Role-boundary tests**: 268 backend tests, including every route checked for member / admin / signed-out access
 - [x] **Migrations** with a data migration that moves existing Week 1 data into the new tables
 - [x] Updated **Swagger** (tags, descriptions, examples), README, `CLAUDE.md` project rules
 
@@ -52,7 +52,7 @@ Week 2 (the assignment):
 | Database | PostgreSQL | Real `EXPLAIN` plans, partial unique indexes, DB-level constraints |
 | Frontend | Next.js (App Router) + TypeScript | Proxies `/api/*` to Django, so the browser sees one origin |
 | API docs | drf-spectacular (Swagger at `/api/docs/`) | Click-through, testable docs |
-| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 262 backend tests, 11 frontend tests |
+| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 268 backend tests, 11 frontend tests |
 
 ## Architecture
 
@@ -121,6 +121,7 @@ that every required write, **profile deletion included**, rolls back completely 
 | **Max 3 contacts and "one primary" enforced in the service under a row lock**, with a partial unique index as backstop | Friendly 400 errors, race-safe, and the database refuses a violation even if code is bypassed | Rules live in two places (documented and tested) |
 | **Phones stored in one canonical form**: optional `+` then **7–15 digits** (`"+92 (300) 123-4567"` → `"+923001234567"`), normalised by `profiles/phones.py` before validation, storage and the duplicate check; CHECK constraint `contact_phone_is_canonical` as backstop | Punctuation can no longer hide a non-number (`1------` is rejected) or a duplicate (`+92-300-123-4567` = `+92 300 1234567`), and the `(profile, phone)` unique constraint now catches equivalent formats too | No country rules without a new dependency: `0300 1234567` and `+92 300 1234567` (or `92…` and `+92…`) are still different numbers. Members see the compact canonical form |
 | **Deactivated profile is read-only** (403 + a `denied` audit event) | Admins can freeze a profile without deleting data | Owner cannot fix their data until reactivated |
+| **One locking policy for every profile change**: member writes *and* admin deactivate / reactivate first lock the profile row (`SELECT … FOR UPDATE`) and decide from that locked, fresh row. Member services re-check `status` in `services._lock()`; the early check in the view is only a fast path | No member write can commit after a deactivation has committed: a request that waited for the lock re-reads the row and gets the same 403. Two admins cannot both record a status change. Same lock, same order everywhere, so no deadlocks | Writes to one profile queue behind each other (they are short). If the re-check refuses a write, the change rolls back first and the `denied` event is written afterwards (best-effort), so the rollback cannot undo it |
 | **Drop Django's redundant single-column FK indexes** where a composite or unique index already starts with that column | Fewer indexes to maintain on writes; the justified index is the one Postgres uses | See "Lessons" below: Django also dropped a partial unique index by mistake, repaired in migration 0006 |
 | **Admin login shares the member login throttle** (5/min per IP) | Same brute-force protection, no extra config | One shared budget per IP |
 
@@ -486,7 +487,7 @@ Real secrets live only in `backend/.env`, which is **git-ignored** and never com
 
 ```bash
 cd backend
-python -m pytest        # 262 passed
+python -m pytest        # 268 passed
 ```
 
 | File | What it proves |
@@ -495,6 +496,7 @@ python -m pytest        # 262 passed
 | `test_profiles.py` | 401 on every member route, own-data-only, 409 on a second profile, profile `DELETE`, deactivated profile = read-only (403 + audited), CSRF required on every write |
 | `test_profile_sections.py` | demographics and wellness: PUT replace vs PATCH, validation (future / ancient date of birth, bad choices, ranges), goals replaced atomically |
 | `test_emergency_contacts.py` | CRUD, max 3, primary rule, duplicate phone, **member A cannot read, edit or delete member B's contact (404)** |
+| `test_concurrency.py` | **PostgreSQL, two real connections in threads**, paused at exact lines with events (no sleep-based timing) and lock waits confirmed through `pg_stat_activity`: deactivation before the member takes the lock (PATCH, contact POST, profile DELETE) → 403 + committed `denied` event; member waiting on the admin's lock → 403; admin waiting on the member's lock → member's 200 counts; two admins → only one status change recorded. Cleanup always releases, joins and closes, and checks no connection or lock is left |
 | `test_phone_normalisation.py` | punctuation-heavy input (`1------`), the 7 / 15 digit boundaries, canonical storage, equivalent formats as duplicates on POST and PATCH, the fourth-contact limit in any format, the database CHECK, and migration 0007 (rewrites rows; stops on unsafe rows naming ids only) |
 | `test_audit.py` | exactly one event per write, no secrets or values in any audit field, append-only, request id on every response and in the audit row, member activity |
 | `test_audit_durability.py` | failure injection: when the required audit insert fails, every member write, profile deletion and admin deactivate / reactivate returns 503 `audit_unavailable` and rolls back completely (data, stored completion, no audit row) |
