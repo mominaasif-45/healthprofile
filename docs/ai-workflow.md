@@ -484,6 +484,20 @@ Answers: 1 yes, add .gitattributes with *.joblib binary. 2 ship the model fitted
 ```
 </details>
 
+<details><summary>10. Phase 4 approval and Phase 5 plan request (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Good. Yes, my Phase 4 'go' message was drafted with help from Claude in a separate chat; please log it. I checked the EXPECTED_SHA256 line myself against Get-FileHash and it matches. Commit Phase 4 with your proposed message, don't push, and show me the commit hash. Then bring me the Phase 5 plan (the versioned inference endpoint with validation and tests) and wait for my 'go'. In the plan, explain: the URL, request and response shapes; how validation reads the schema in the metadata; what happens with malformed, out-of-range and extra fields; how the model is loaded once (and what happens if loading fails); auth, CSRF and the throttle; what is not logged; and the Swagger documentation.
+```
+</details>
+
+<details><summary>11. Phase 5 decision (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Answers: 1 yes, members without a profile or with a deactivated profile may use the demo. 2 yes, 30 per minute per member. 3 yes, my last message (the Phase 4 commit and the Phase 5 plan request) was drafted with help from Claude in a separate chat; please log it. Go. Tests first, shown failing (404) then passing. Run the full suite, show git diff --stat, explain in plain words with one real example request and response, and don't commit until I approve.
+```
+</details>
+
 ### My decisions and corrections
 
 | Phase | Options I was given | What I decided or added |
@@ -493,6 +507,7 @@ Answers: 1 yes, add .gitattributes with *.joblib binary. 2 ship the model fitted
 | 2 Split and analysis | 70 / 15 / 15 stratified split; median + "was blank" column for numbers, `missing` category for blanks; `hour` as a category; analysis on the training pile only | Approved as proposed; asked again for tests first with fail-then-pass proof |
 | 3 Models | Threshold: best F1 or "at least 60% recall, best precision"; an extra model without `age_band` | **Best F1**; **skipped** the `age_band` experiment (README future work, Phase 7). **Changed the leakage alarm**: the plan alarmed at the pile's ceiling itself. The idea of a margin (an honest model can beat a ceiling measured on the same finite pile by luck, so alarm only above the ceiling **+ 0.03** or above 0.90) was **suggested by Claude in the separate chat**; I reviewed and approved it, and asked for the margin to be explained in the report. Asked for the slow retraining test to be skippable with a flag but run by default |
 | 4 Artifact | Add `.gitattributes` (`*.joblib binary`, outside the approved file list); ship the model fitted on training rows only, or refit on training + validation | Approved `.gitattributes`; **training rows only**, so the shipped file is exactly the one the report describes; added: the README must say a production system would refit on all the data and re-derive the threshold |
+| 5 Endpoint | Members with no profile or a deactivated profile: allow, or refuse with 403; the throttle rate | **Allowed** (the endpoint never touches profile data); **30 requests per minute per member** |
 
 ### What the checks caught
 
@@ -533,3 +548,14 @@ Answers: 1 yes, add .gitattributes with *.joblib binary. 2 ship the model fitted
 - **Phase 4, the human step.** After the first training run, the new checksum was pasted into `EXPECTED_SHA256` in
   `ml/artifact.py`; this is the reviewed code change that accepts a model file. I checked that line myself against
   PowerShell's `Get-FileHash` on the `.joblib` file, and it matches.
+- **Phase 5, failing for the right reason.** Before the route existed, all 68 new tests failed because of it: the 404
+  "Not Found" page, plus three that could not find `ml.views`, `ml.predictor` or the schema path. To make them fail
+  with 404 rather than stop at import, the test file imports the new modules only inside the tests that need them.
+- **Phase 5, the checks checked.** Four deliberate breaks were each caught: ignoring unknown fields instead of
+  rejecting them, removing the strict whole-number check (2 tests failed: `"21"` and `21.0`, the two values plain DRF
+  quietly accepts), logging the inputs in the view, and removing the throttle.
+- **Phase 5, a Swagger warning.** The new `age_band` field has the same six values as the profile's `age_range`, so
+  drf-spectacular warned about one choice set with two names. Fixed with one `ENUM_NAME_OVERRIDES` entry that keeps
+  the existing name `AgeRangeEnum`; the schema now builds with no warnings.
+- **Phase 5, real examples only.** The Swagger response examples are real outputs of `noshow-1.0.0`; a test sends each
+  example request and checks the response matches exactly.

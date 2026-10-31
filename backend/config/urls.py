@@ -13,4 +13,6 @@ urlpatterns = [
     path("api/profiles/", include("profiles.urls")),
     # Admins (server-side session): login, logout, me, list/search/detail/deactivate
     path("api/admin/", include("adminpanel.urls")),
+    # Members: educational no-show demo on synthetic data (v1 = request/response contract)
+    path("api/ml/v1/", include("ml.urls")),
 ]

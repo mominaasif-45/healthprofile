@@ -100,7 +100,7 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
-    "DEFAULT_THROTTLE_RATES": {"login": "5/min"},
+    "DEFAULT_THROTTLE_RATES": {"login": "5/min", "ml_predict": "30/min"},
            "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
 }
 
@@ -149,5 +149,7 @@ SPECTACULAR_SETTINGS = {
     "ENUM_NAME_OVERRIDES": {
         "ProfileStatusEnum": "profiles.models.HealthProfile.Status",
         "CompletionStatusEnum": "profiles.models.HealthProfile.CompletionStatus",
+        # Profile age_range and the ML demo's age_band share these six values: one name for both.
+        "AgeRangeEnum": "profiles.models.Demographics.AgeRange",
     },
 }
