@@ -1,0 +1,1580 @@
+{
+  "settings": {
+    "split_seed": 42,
+    "model_seed": 42,
+    "cv_folds": 5,
+    "bootstrap_rounds": 1000,
+    "leakage_margin": 0.03,
+    "max_plausible_auc": 0.9,
+    "small_rows": 100,
+    "small_no_shows": 20
+  },
+  "pile_sizes": {
+    "train": {
+      "rows": 4200,
+      "no_shows": 874
+    },
+    "validation": {
+      "rows": 900,
+      "no_shows": 187
+    },
+    "test": {
+      "rows": 900,
+      "no_shows": 187
+    }
+  },
+  "ceilings": {
+    "train": 0.665,
+    "validation": 0.6375,
+    "test": 0.6393
+  },
+  "tuning": {
+    "baseline": {
+      "best_params": {},
+      "cv_pr_auc": null
+    },
+    "logistic_regression": {
+      "best_params": {
+        "C": 0.1
+      },
+      "cv_pr_auc": 0.3468
+    },
+    "gradient_boosting": {
+      "best_params": {
+        "learning_rate": 0.1,
+        "max_depth": 2,
+        "max_iter": 100
+      },
+      "cv_pr_auc": 0.328
+    }
+  },
+  "train": {
+    "baseline": {
+      "roc_auc": 0.5,
+      "pr_auc": 0.2081
+    },
+    "logistic_regression": {
+      "roc_auc": 0.6715,
+      "pr_auc": 0.3663
+    },
+    "gradient_boosting": {
+      "roc_auc": 0.7083,
+      "pr_auc": 0.4236
+    }
+  },
+  "validation": {
+    "baseline": {
+      "roc_auc": 0.5,
+      "pr_auc": 0.2078,
+      "brier": 0.1646,
+      "threshold": 0.2,
+      "precision": 0.2078,
+      "recall": 1.0,
+      "f1": 0.3441,
+      "balanced_accuracy": 0.5,
+      "accuracy": 0.2078,
+      "tp": 187,
+      "fp": 713,
+      "fn": 0,
+      "tn": 0
+    },
+    "logistic_regression": {
+      "roc_auc": 0.6269,
+      "pr_auc": 0.308,
+      "brier": 0.1595,
+      "threshold": 0.22,
+      "precision": 0.3086,
+      "recall": 0.5348,
+      "f1": 0.3914,
+      "balanced_accuracy": 0.6103,
+      "accuracy": 0.6544,
+      "tp": 100,
+      "fp": 224,
+      "fn": 87,
+      "tn": 489
+    },
+    "gradient_boosting": {
+      "roc_auc": 0.6217,
+      "pr_auc": 0.324,
+      "brier": 0.1582,
+      "threshold": 0.23,
+      "precision": 0.3151,
+      "recall": 0.492,
+      "f1": 0.3841,
+      "balanced_accuracy": 0.6057,
+      "accuracy": 0.6722,
+      "tp": 92,
+      "fp": 200,
+      "fn": 95,
+      "tn": 513
+    }
+  },
+  "comparisons": {
+    "logistic_regression_vs_baseline": {
+      "diff": 0.1002,
+      "low": 0.0623,
+      "high": 0.1579
+    },
+    "gradient_boosting_vs_baseline": {
+      "diff": 0.1162,
+      "low": 0.0703,
+      "high": 0.1777
+    },
+    "gradient_boosting_vs_logistic_regression": {
+      "diff": 0.016,
+      "low": -0.0126,
+      "high": 0.0451
+    }
+  },
+  "chosen": "logistic_regression",
+  "threshold_table": [
+    {
+      "threshold": 0.15,
+      "precision": 0.2362,
+      "recall": 0.7326,
+      "f1": 0.3572,
+      "balanced_accuracy": 0.5557,
+      "accuracy": 0.4522,
+      "tp": 137,
+      "fp": 443,
+      "fn": 50,
+      "tn": 270
+    },
+    {
+      "threshold": 0.2,
+      "precision": 0.2806,
+      "recall": 0.5882,
+      "f1": 0.38,
+      "balanced_accuracy": 0.5964,
+      "accuracy": 0.6011,
+      "tp": 110,
+      "fp": 282,
+      "fn": 77,
+      "tn": 431
+    },
+    {
+      "threshold": 0.25,
+      "precision": 0.3228,
+      "recall": 0.4385,
+      "f1": 0.3719,
+      "balanced_accuracy": 0.5986,
+      "accuracy": 0.6922,
+      "tp": 82,
+      "fp": 172,
+      "fn": 105,
+      "tn": 541
+    },
+    {
+      "threshold": 0.3,
+      "precision": 0.3203,
+      "recall": 0.262,
+      "f1": 0.2882,
+      "balanced_accuracy": 0.5581,
+      "accuracy": 0.7311,
+      "tp": 49,
+      "fp": 104,
+      "fn": 138,
+      "tn": 609
+    },
+    {
+      "threshold": 0.35,
+      "precision": 0.3908,
+      "recall": 0.1818,
+      "f1": 0.2482,
+      "balanced_accuracy": 0.5537,
+      "accuracy": 0.7711,
+      "tp": 34,
+      "fp": 53,
+      "fn": 153,
+      "tn": 660
+    },
+    {
+      "threshold": 0.4,
+      "precision": 0.3725,
+      "recall": 0.1016,
+      "f1": 0.1597,
+      "balanced_accuracy": 0.5284,
+      "accuracy": 0.7778,
+      "tp": 19,
+      "fp": 32,
+      "fn": 168,
+      "tn": 681
+    }
+  ],
+  "test": {
+    "baseline": {
+      "roc_auc": 0.5,
+      "pr_auc": 0.2078,
+      "brier": 0.1646,
+      "threshold": 0.2,
+      "precision": 0.2078,
+      "recall": 1.0,
+      "f1": 0.3441,
+      "balanced_accuracy": 0.5,
+      "accuracy": 0.2078,
+      "tp": 187,
+      "fp": 713,
+      "fn": 0,
+      "tn": 0
+    },
+    "logistic_regression": {
+      "roc_auc": 0.6168,
+      "pr_auc": 0.3396,
+      "brier": 0.1585,
+      "threshold": 0.22,
+      "precision": 0.295,
+      "recall": 0.508,
+      "f1": 0.3733,
+      "balanced_accuracy": 0.5948,
+      "accuracy": 0.6456,
+      "tp": 95,
+      "fp": 227,
+      "fn": 92,
+      "tn": 486
+    },
+    "gradient_boosting": {
+      "roc_auc": 0.6199,
+      "pr_auc": 0.3161,
+      "brier": 0.159,
+      "threshold": 0.23,
+      "precision": 0.2939,
+      "recall": 0.4652,
+      "f1": 0.3602,
+      "balanced_accuracy": 0.5861,
+      "accuracy": 0.6567,
+      "tp": 87,
+      "fp": 209,
+      "fn": 100,
+      "tn": 504
+    }
+  },
+  "groups": {
+    "validation": [
+      {
+        "column": "age_band",
+        "value": "18-24",
+        "rows": 120,
+        "no_shows": 23,
+        "small": false,
+        "actual_rate": 0.1917,
+        "mean_predicted": 0.2481,
+        "recall": {
+          "value": 0.6957,
+          "low": 0.5185,
+          "high": 0.8696
+        },
+        "false_alarm_rate": {
+          "value": 0.4639,
+          "low": 0.3714,
+          "high": 0.5638
+        },
+        "precision": {
+          "value": 0.2623,
+          "low": 0.1562,
+          "high": 0.3793
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "25-34",
+        "rows": 216,
+        "no_shows": 47,
+        "small": false,
+        "actual_rate": 0.2176,
+        "mean_predicted": 0.2056,
+        "recall": {
+          "value": 0.4894,
+          "low": 0.3478,
+          "high": 0.6305
+        },
+        "false_alarm_rate": {
+          "value": 0.3195,
+          "low": 0.2542,
+          "high": 0.3869
+        },
+        "precision": {
+          "value": 0.2987,
+          "low": 0.2,
+          "high": 0.4054
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "35-44",
+        "rows": 189,
+        "no_shows": 42,
+        "small": false,
+        "actual_rate": 0.2222,
+        "mean_predicted": 0.1982,
+        "recall": {
+          "value": 0.5476,
+          "low": 0.3947,
+          "high": 0.7027
+        },
+        "false_alarm_rate": {
+          "value": 0.2449,
+          "low": 0.1805,
+          "high": 0.3154
+        },
+        "precision": {
+          "value": 0.3898,
+          "low": 0.2727,
+          "high": 0.5106
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "45-54",
+        "rows": 145,
+        "no_shows": 25,
+        "small": false,
+        "actual_rate": 0.1724,
+        "mean_predicted": 0.1945,
+        "recall": {
+          "value": 0.48,
+          "low": 0.2856,
+          "high": 0.6667
+        },
+        "false_alarm_rate": {
+          "value": 0.2917,
+          "low": 0.2113,
+          "high": 0.3761
+        },
+        "precision": {
+          "value": 0.2553,
+          "low": 0.1321,
+          "high": 0.3878
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "55-64",
+        "rows": 125,
+        "no_shows": 31,
+        "small": false,
+        "actual_rate": 0.248,
+        "mean_predicted": 0.1848,
+        "recall": {
+          "value": 0.3871,
+          "low": 0.2173,
+          "high": 0.5714
+        },
+        "false_alarm_rate": {
+          "value": 0.2128,
+          "low": 0.1354,
+          "high": 0.2922
+        },
+        "precision": {
+          "value": 0.375,
+          "low": 0.2,
+          "high": 0.5418
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "65+",
+        "rows": 75,
+        "no_shows": 15,
+        "small": true,
+        "actual_rate": 0.2,
+        "mean_predicted": 0.2433,
+        "recall": {
+          "value": 0.8,
+          "low": 0.5625,
+          "high": 1.0
+        },
+        "false_alarm_rate": {
+          "value": 0.4667,
+          "low": 0.3559,
+          "high": 0.6
+        },
+        "precision": {
+          "value": 0.3,
+          "low": 0.1667,
+          "high": 0.4359
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "(blank)",
+        "rows": 30,
+        "no_shows": 4,
+        "small": true,
+        "actual_rate": 0.1333,
+        "mean_predicted": 0.1867,
+        "recall": {
+          "value": 0.5,
+          "low": 0.0,
+          "high": 1.0
+        },
+        "false_alarm_rate": {
+          "value": 0.2308,
+          "low": 0.0799,
+          "high": 0.4002
+        },
+        "precision": {
+          "value": 0.25,
+          "low": 0.0,
+          "high": 0.625
+        }
+      },
+      {
+        "column": "booking_channel",
+        "value": "online",
+        "rows": 467,
+        "no_shows": 88,
+        "small": false,
+        "actual_rate": 0.1884,
+        "mean_predicted": 0.2111,
+        "recall": {
+          "value": 0.5,
+          "low": 0.3939,
+          "high": 0.6076
+        },
+        "false_alarm_rate": {
+          "value": 0.3113,
+          "low": 0.2686,
+          "high": 0.3556
+        },
+        "precision": {
+          "value": 0.2716,
+          "low": 0.2035,
+          "high": 0.3481
+        }
+      },
+      {
+        "column": "booking_channel",
+        "value": "phone",
+        "rows": 340,
+        "no_shows": 80,
+        "small": false,
+        "actual_rate": 0.2353,
+        "mean_predicted": 0.2096,
+        "recall": {
+          "value": 0.5375,
+          "low": 0.4285,
+          "high": 0.6448
+        },
+        "false_alarm_rate": {
+          "value": 0.35,
+          "low": 0.293,
+          "high": 0.4076
+        },
+        "precision": {
+          "value": 0.3209,
+          "low": 0.2466,
+          "high": 0.3968
+        }
+      },
+      {
+        "column": "booking_channel",
+        "value": "in_person",
+        "rows": 93,
+        "no_shows": 19,
+        "small": true,
+        "actual_rate": 0.2043,
+        "mean_predicted": 0.1823,
+        "recall": {
+          "value": 0.6842,
+          "low": 0.4782,
+          "high": 0.8947
+        },
+        "false_alarm_rate": {
+          "value": 0.2027,
+          "low": 0.1143,
+          "high": 0.3056
+        },
+        "precision": {
+          "value": 0.4643,
+          "low": 0.2902,
+          "high": 0.65
+        }
+      },
+      {
+        "column": "distance_band",
+        "value": "under_5km",
+        "rows": 295,
+        "no_shows": 44,
+        "small": false,
+        "actual_rate": 0.1492,
+        "mean_predicted": 0.188,
+        "recall": {
+          "value": 0.3864,
+          "low": 0.2321,
+          "high": 0.5306
+        },
+        "false_alarm_rate": {
+          "value": 0.2669,
+          "low": 0.2134,
+          "high": 0.3186
+        },
+        "precision": {
+          "value": 0.2024,
+          "low": 0.1111,
+          "high": 0.2955
+        }
+      },
+      {
+        "column": "distance_band",
+        "value": "5_15km",
+        "rows": 266,
+        "no_shows": 62,
+        "small": false,
+        "actual_rate": 0.2331,
+        "mean_predicted": 0.1953,
+        "recall": {
+          "value": 0.4839,
+          "low": 0.3703,
+          "high": 0.6053
+        },
+        "false_alarm_rate": {
+          "value": 0.2794,
+          "low": 0.2199,
+          "high": 0.3434
+        },
+        "precision": {
+          "value": 0.3448,
+          "low": 0.2524,
+          "high": 0.4457
+        }
+      },
+      {
+        "column": "distance_band",
+        "value": "15_30km",
+        "rows": 170,
+        "no_shows": 28,
+        "small": false,
+        "actual_rate": 0.1647,
+        "mean_predicted": 0.2303,
+        "recall": {
+          "value": 0.75,
+          "low": 0.5806,
+          "high": 0.8929
+        },
+        "false_alarm_rate": {
+          "value": 0.3732,
+          "low": 0.2917,
+          "high": 0.4533
+        },
+        "precision": {
+          "value": 0.2838,
+          "low": 0.1875,
+          "high": 0.3827
+        }
+      },
+      {
+        "column": "distance_band",
+        "value": "over_30km",
+        "rows": 87,
+        "no_shows": 31,
+        "small": true,
+        "actual_rate": 0.3563,
+        "mean_predicted": 0.2636,
+        "recall": {
+          "value": 0.7742,
+          "low": 0.6175,
+          "high": 0.9092
+        },
+        "false_alarm_rate": {
+          "value": 0.4643,
+          "low": 0.3279,
+          "high": 0.5965
+        },
+        "precision": {
+          "value": 0.48,
+          "low": 0.3393,
+          "high": 0.617
+        }
+      },
+      {
+        "column": "distance_band",
+        "value": "(blank)",
+        "rows": 82,
+        "no_shows": 22,
+        "small": true,
+        "actual_rate": 0.2683,
+        "mean_predicted": 0.211,
+        "recall": {
+          "value": 0.3636,
+          "low": 0.1667,
+          "high": 0.5789
+        },
+        "false_alarm_rate": {
+          "value": 0.35,
+          "low": 0.2321,
+          "high": 0.4762
+        },
+        "precision": {
+          "value": 0.2759,
+          "low": 0.1249,
+          "high": 0.4517
+        }
+      }
+    ],
+    "test": [
+      {
+        "column": "age_band",
+        "value": "18-24",
+        "rows": 119,
+        "no_shows": 26,
+        "small": false,
+        "actual_rate": 0.2185,
+        "mean_predicted": 0.2433,
+        "recall": {
+          "value": 0.6154,
+          "low": 0.4074,
+          "high": 0.8125
+        },
+        "false_alarm_rate": {
+          "value": 0.3978,
+          "low": 0.303,
+          "high": 0.495
+        },
+        "precision": {
+          "value": 0.3019,
+          "low": 0.1774,
+          "high": 0.4315
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "25-34",
+        "rows": 202,
+        "no_shows": 45,
+        "small": false,
+        "actual_rate": 0.2228,
+        "mean_predicted": 0.202,
+        "recall": {
+          "value": 0.5111,
+          "low": 0.3684,
+          "high": 0.6598
+        },
+        "false_alarm_rate": {
+          "value": 0.2866,
+          "low": 0.2193,
+          "high": 0.3567
+        },
+        "precision": {
+          "value": 0.3382,
+          "low": 0.2318,
+          "high": 0.4474
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "35-44",
+        "rows": 178,
+        "no_shows": 35,
+        "small": false,
+        "actual_rate": 0.1966,
+        "mean_predicted": 0.2075,
+        "recall": {
+          "value": 0.4,
+          "low": 0.2498,
+          "high": 0.5714
+        },
+        "false_alarm_rate": {
+          "value": 0.3287,
+          "low": 0.25,
+          "high": 0.404
+        },
+        "precision": {
+          "value": 0.2295,
+          "low": 0.1311,
+          "high": 0.3433
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "45-54",
+        "rows": 154,
+        "no_shows": 31,
+        "small": false,
+        "actual_rate": 0.2013,
+        "mean_predicted": 0.2178,
+        "recall": {
+          "value": 0.6452,
+          "low": 0.4706,
+          "high": 0.8182
+        },
+        "false_alarm_rate": {
+          "value": 0.3415,
+          "low": 0.264,
+          "high": 0.4228
+        },
+        "precision": {
+          "value": 0.3226,
+          "low": 0.203,
+          "high": 0.4386
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "55-64",
+        "rows": 126,
+        "no_shows": 24,
+        "small": false,
+        "actual_rate": 0.1905,
+        "mean_predicted": 0.177,
+        "recall": {
+          "value": 0.375,
+          "low": 0.1818,
+          "high": 0.5789
+        },
+        "false_alarm_rate": {
+          "value": 0.2255,
+          "low": 0.1428,
+          "high": 0.3069
+        },
+        "precision": {
+          "value": 0.2812,
+          "low": 0.1289,
+          "high": 0.4445
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "65+",
+        "rows": 79,
+        "no_shows": 15,
+        "small": true,
+        "actual_rate": 0.1899,
+        "mean_predicted": 0.2163,
+        "recall": {
+          "value": 0.6667,
+          "low": 0.3888,
+          "high": 0.9
+        },
+        "false_alarm_rate": {
+          "value": 0.3906,
+          "low": 0.2698,
+          "high": 0.5156
+        },
+        "precision": {
+          "value": 0.2857,
+          "low": 0.1515,
+          "high": 0.4516
+        }
+      },
+      {
+        "column": "age_band",
+        "value": "(blank)",
+        "rows": 42,
+        "no_shows": 11,
+        "small": true,
+        "actual_rate": 0.2619,
+        "mean_predicted": 0.1859,
+        "recall": {
+          "value": 0.2727,
+          "low": 0.0,
+          "high": 0.5714
+        },
+        "false_alarm_rate": {
+          "value": 0.2581,
+          "low": 0.1034,
+          "high": 0.4242
+        },
+        "precision": {
+          "value": 0.2727,
+          "low": 0.0,
+          "high": 0.5833
+        }
+      },
+      {
+        "column": "booking_channel",
+        "value": "online",
+        "rows": 455,
+        "no_shows": 90,
+        "small": false,
+        "actual_rate": 0.1978,
+        "mean_predicted": 0.2153,
+        "recall": {
+          "value": 0.5,
+          "low": 0.3917,
+          "high": 0.5926
+        },
+        "false_alarm_rate": {
+          "value": 0.3342,
+          "low": 0.2876,
+          "high": 0.3818
+        },
+        "precision": {
+          "value": 0.2695,
+          "low": 0.2013,
+          "high": 0.3354
+        }
+      },
+      {
+        "column": "booking_channel",
+        "value": "phone",
+        "rows": 341,
+        "no_shows": 76,
+        "small": false,
+        "actual_rate": 0.2229,
+        "mean_predicted": 0.2066,
+        "recall": {
+          "value": 0.5526,
+          "low": 0.4318,
+          "high": 0.6628
+        },
+        "false_alarm_rate": {
+          "value": 0.3283,
+          "low": 0.2744,
+          "high": 0.3846
+        },
+        "precision": {
+          "value": 0.3256,
+          "low": 0.2467,
+          "high": 0.4101
+        }
+      },
+      {
+        "column": "booking_channel",
+        "value": "in_person",
+        "rows": 104,
+        "no_shows": 21,
+        "small": false,
+        "actual_rate": 0.2019,
+        "mean_predicted": 0.1829,
+        "recall": {
+          "value": 0.381,
+          "low": 0.1667,
+          "high": 0.6
+        },
+        "false_alarm_rate": {
+          "value": 0.2169,
+          "low": 0.131,
+          "high": 0.3125
+        },
+        "precision": {
+          "value": 0.3077,
+          "low": 0.125,
+          "high": 0.5
+        }
+      },
+      {
+        "column": "distance_band",
+        "value": "under_5km",
+        "rows": 293,
+        "no_shows": 51,
+        "small": false,
+        "actual_rate": 0.1741,
+        "mean_predicted": 0.1897,
+        "recall": {
+          "value": 0.451,
+          "low": 0.3148,
+          "high": 0.5854
+        },
+        "false_alarm_rate": {
+          "value": 0.2645,
+          "low": 0.2075,
+          "high": 0.3191
+        },
+        "precision": {
+          "value": 0.2644,
+          "low": 0.1786,
+          "high": 0.3618
+        }
+      },
+      {
+        "column": "distance_band",
+        "value": "5_15km",
+        "rows": 294,
+        "no_shows": 67,
+        "small": false,
+        "actual_rate": 0.2279,
+        "mean_predicted": 0.1916,
+        "recall": {
+          "value": 0.4627,
+          "low": 0.3333,
+          "high": 0.5781
+        },
+        "false_alarm_rate": {
+          "value": 0.2423,
+          "low": 0.1899,
+          "high": 0.3022
+        },
+        "precision": {
+          "value": 0.3605,
+          "low": 0.2551,
+          "high": 0.4588
+        }
+      },
+      {
+        "column": "distance_band",
+        "value": "15_30km",
+        "rows": 152,
+        "no_shows": 34,
+        "small": false,
+        "actual_rate": 0.2237,
+        "mean_predicted": 0.2482,
+        "recall": {
+          "value": 0.5588,
+          "low": 0.3913,
+          "high": 0.7188
+        },
+        "false_alarm_rate": {
+          "value": 0.4492,
+          "low": 0.3611,
+          "high": 0.5385
+        },
+        "precision": {
+          "value": 0.2639,
+          "low": 0.1639,
+          "high": 0.3714
+        }
+      },
+      {
+        "column": "distance_band",
+        "value": "over_30km",
+        "rows": 96,
+        "no_shows": 21,
+        "small": true,
+        "actual_rate": 0.2188,
+        "mean_predicted": 0.253,
+        "recall": {
+          "value": 0.5714,
+          "low": 0.3548,
+          "high": 0.8
+        },
+        "false_alarm_rate": {
+          "value": 0.5467,
+          "low": 0.4225,
+          "high": 0.6622
+        },
+        "precision": {
+          "value": 0.2264,
+          "low": 0.1207,
+          "high": 0.36
+        }
+      },
+      {
+        "column": "distance_band",
+        "value": "(blank)",
+        "rows": 65,
+        "no_shows": 14,
+        "small": true,
+        "actual_rate": 0.2154,
+        "mean_predicted": 0.2081,
+        "recall": {
+          "value": 0.7143,
+          "low": 0.4615,
+          "high": 0.9286
+        },
+        "false_alarm_rate": {
+          "value": 0.2745,
+          "low": 0.16,
+          "high": 0.4001
+        },
+        "precision": {
+          "value": 0.4167,
+          "low": 0.2174,
+          "high": 0.6253
+        }
+      }
+    ]
+  },
+  "calibration": {
+    "validation": [
+      {
+        "band": 1,
+        "rows": 90,
+        "min_p": 0.052,
+        "max_p": 0.1011,
+        "mean_predicted": 0.0854,
+        "actual_rate": 0.1333
+      },
+      {
+        "band": 2,
+        "rows": 90,
+        "min_p": 0.1011,
+        "max_p": 0.1206,
+        "mean_predicted": 0.1116,
+        "actual_rate": 0.1111
+      },
+      {
+        "band": 3,
+        "rows": 90,
+        "min_p": 0.121,
+        "max_p": 0.1375,
+        "mean_predicted": 0.1292,
+        "actual_rate": 0.2
+      },
+      {
+        "band": 4,
+        "rows": 90,
+        "min_p": 0.1378,
+        "max_p": 0.1591,
+        "mean_predicted": 0.1488,
+        "actual_rate": 0.1778
+      },
+      {
+        "band": 5,
+        "rows": 90,
+        "min_p": 0.1593,
+        "max_p": 0.1831,
+        "mean_predicted": 0.1707,
+        "actual_rate": 0.1
+      },
+      {
+        "band": 6,
+        "rows": 90,
+        "min_p": 0.1831,
+        "max_p": 0.2092,
+        "mean_predicted": 0.1967,
+        "actual_rate": 0.1889
+      },
+      {
+        "band": 7,
+        "rows": 90,
+        "min_p": 0.2093,
+        "max_p": 0.2412,
+        "mean_predicted": 0.225,
+        "actual_rate": 0.2111
+      },
+      {
+        "band": 8,
+        "rows": 90,
+        "min_p": 0.2415,
+        "max_p": 0.2833,
+        "mean_predicted": 0.2609,
+        "actual_rate": 0.2889
+      },
+      {
+        "band": 9,
+        "rows": 90,
+        "min_p": 0.2834,
+        "max_p": 0.3478,
+        "mean_predicted": 0.314,
+        "actual_rate": 0.2667
+      },
+      {
+        "band": 10,
+        "rows": 90,
+        "min_p": 0.3478,
+        "max_p": 0.6623,
+        "mean_predicted": 0.4332,
+        "actual_rate": 0.4
+      }
+    ],
+    "test": [
+      {
+        "band": 1,
+        "rows": 90,
+        "min_p": 0.0477,
+        "max_p": 0.0987,
+        "mean_predicted": 0.0809,
+        "actual_rate": 0.1111
+      },
+      {
+        "band": 2,
+        "rows": 90,
+        "min_p": 0.0988,
+        "max_p": 0.1225,
+        "mean_predicted": 0.1108,
+        "actual_rate": 0.1889
+      },
+      {
+        "band": 3,
+        "rows": 90,
+        "min_p": 0.123,
+        "max_p": 0.1452,
+        "mean_predicted": 0.1346,
+        "actual_rate": 0.1556
+      },
+      {
+        "band": 4,
+        "rows": 90,
+        "min_p": 0.1455,
+        "max_p": 0.1661,
+        "mean_predicted": 0.1559,
+        "actual_rate": 0.1667
+      },
+      {
+        "band": 5,
+        "rows": 90,
+        "min_p": 0.1662,
+        "max_p": 0.1871,
+        "mean_predicted": 0.1759,
+        "actual_rate": 0.1778
+      },
+      {
+        "band": 6,
+        "rows": 90,
+        "min_p": 0.1873,
+        "max_p": 0.2099,
+        "mean_predicted": 0.1978,
+        "actual_rate": 0.1333
+      },
+      {
+        "band": 7,
+        "rows": 90,
+        "min_p": 0.2101,
+        "max_p": 0.2348,
+        "mean_predicted": 0.2217,
+        "actual_rate": 0.2222
+      },
+      {
+        "band": 8,
+        "rows": 90,
+        "min_p": 0.2349,
+        "max_p": 0.2847,
+        "mean_predicted": 0.2555,
+        "actual_rate": 0.2444
+      },
+      {
+        "band": 9,
+        "rows": 90,
+        "min_p": 0.2854,
+        "max_p": 0.3451,
+        "mean_predicted": 0.313,
+        "actual_rate": 0.2667
+      },
+      {
+        "band": 10,
+        "rows": 90,
+        "min_p": 0.3482,
+        "max_p": 0.859,
+        "mean_predicted": 0.4366,
+        "actual_rate": 0.4111
+      }
+    ]
+  },
+  "errors": {
+    "profile": [
+      {
+        "box": "caught no-shows (TP)",
+        "rows": 100,
+        "mean_predicted": 0.3304,
+        "no_reminder": 0.53,
+        "mean_lead_time": 20.2,
+        "any_prior_no_show": 0.49,
+        "phone_booking": 0.43
+      },
+      {
+        "box": "missed no-shows (FN)",
+        "rows": 87,
+        "mean_predicted": 0.1481,
+        "no_reminder": 0.2184,
+        "mean_lead_time": 9.0805,
+        "any_prior_no_show": 0.2299,
+        "phone_booking": 0.4253
+      },
+      {
+        "box": "false alarms (FP)",
+        "rows": 224,
+        "mean_predicted": 0.3133,
+        "no_reminder": 0.4955,
+        "mean_lead_time": 18.558,
+        "any_prior_no_show": 0.4375,
+        "phone_booking": 0.4062
+      },
+      {
+        "box": "correctly cleared (TN)",
+        "rows": 489,
+        "mean_predicted": 0.1446,
+        "no_reminder": 0.135,
+        "mean_lead_time": 8.7301,
+        "any_prior_no_show": 0.1575,
+        "phone_booking": 0.3456
+      }
+    ],
+    "false_alarms": [
+      {
+        "appointment_id": "A00018",
+        "lead_time_days": 79,
+        "weekday": "mon",
+        "hour": 15,
+        "visit_type": "follow_up",
+        "booking_channel": "phone",
+        "reminder_sent": "no",
+        "prior_visits": 3,
+        "prior_no_shows": 0,
+        "distance_band": "15_30km",
+        "age_band": null,
+        "no_show": 0,
+        "p": 0.6623
+      },
+      {
+        "appointment_id": "A00797",
+        "lead_time_days": 82,
+        "weekday": "mon",
+        "hour": 8,
+        "visit_type": "new_visit",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 2,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "25-34",
+        "no_show": 0,
+        "p": 0.6435
+      },
+      {
+        "appointment_id": "A04329",
+        "lead_time_days": 37,
+        "weekday": "fri",
+        "hour": 17,
+        "visit_type": "new_visit",
+        "booking_channel": "online",
+        "reminder_sent": "no",
+        "prior_visits": 4,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "18-24",
+        "no_show": 0,
+        "p": 0.6287
+      },
+      {
+        "appointment_id": "A03133",
+        "lead_time_days": 19,
+        "weekday": "mon",
+        "hour": 17,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "no",
+        "prior_visits": 4,
+        "prior_no_shows": 2,
+        "distance_band": "under_5km",
+        "age_band": "65+",
+        "no_show": 0,
+        "p": 0.5569
+      },
+      {
+        "appointment_id": "A00868",
+        "lead_time_days": 51,
+        "weekday": "fri",
+        "hour": 17,
+        "visit_type": "routine_checkup",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 4,
+        "prior_no_shows": 1,
+        "distance_band": "5_15km",
+        "age_band": "65+",
+        "no_show": 0,
+        "p": 0.5491
+      },
+      {
+        "appointment_id": "A03988",
+        "lead_time_days": 20,
+        "weekday": "wed",
+        "hour": 16,
+        "visit_type": "new_visit",
+        "booking_channel": "online",
+        "reminder_sent": "no",
+        "prior_visits": 4,
+        "prior_no_shows": 1,
+        "distance_band": "over_30km",
+        "age_band": "35-44",
+        "no_show": 0,
+        "p": 0.5326
+      },
+      {
+        "appointment_id": "A03993",
+        "lead_time_days": 63,
+        "weekday": "mon",
+        "hour": 11,
+        "visit_type": "follow_up",
+        "booking_channel": "phone",
+        "reminder_sent": "no",
+        "prior_visits": 1,
+        "prior_no_shows": 0,
+        "distance_band": "15_30km",
+        "age_band": "55-64",
+        "no_show": 0,
+        "p": 0.5271
+      },
+      {
+        "appointment_id": "A00897",
+        "lead_time_days": 59,
+        "weekday": "tue",
+        "hour": 8,
+        "visit_type": "routine_checkup",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 1,
+        "prior_no_shows": 1,
+        "distance_band": "under_5km",
+        "age_band": "65+",
+        "no_show": 0,
+        "p": 0.5221
+      },
+      {
+        "appointment_id": "A03315",
+        "lead_time_days": 23,
+        "weekday": "tue",
+        "hour": 17,
+        "visit_type": "routine_checkup",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 5,
+        "prior_no_shows": 4,
+        "distance_band": "5_15km",
+        "age_band": "45-54",
+        "no_show": 0,
+        "p": 0.52
+      },
+      {
+        "appointment_id": "A02102",
+        "lead_time_days": 6,
+        "weekday": "mon",
+        "hour": 17,
+        "visit_type": "new_visit",
+        "booking_channel": "phone",
+        "reminder_sent": "no",
+        "prior_visits": 2,
+        "prior_no_shows": 1,
+        "distance_band": "under_5km",
+        "age_band": "18-24",
+        "no_show": 0,
+        "p": 0.4902
+      }
+    ],
+    "misses": [
+      {
+        "appointment_id": "A03634",
+        "lead_time_days": 2,
+        "weekday": "wed",
+        "hour": 13,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 5,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "35-44",
+        "no_show": 1,
+        "p": 0.072
+      },
+      {
+        "appointment_id": "A04020",
+        "lead_time_days": 1,
+        "weekday": "thu",
+        "hour": 13,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 2,
+        "prior_no_shows": 0,
+        "distance_band": "5_15km",
+        "age_band": "35-44",
+        "no_show": 1,
+        "p": 0.074
+      },
+      {
+        "appointment_id": "A00247",
+        "lead_time_days": 4,
+        "weekday": "thu",
+        "hour": 9,
+        "visit_type": "follow_up",
+        "booking_channel": "phone",
+        "reminder_sent": "yes",
+        "prior_visits": 2,
+        "prior_no_shows": 0,
+        "distance_band": null,
+        "age_band": "45-54",
+        "no_show": 1,
+        "p": 0.0768
+      },
+      {
+        "appointment_id": "A03399",
+        "lead_time_days": 16,
+        "weekday": "thu",
+        "hour": 10,
+        "visit_type": "new_visit",
+        "booking_channel": "in_person",
+        "reminder_sent": "yes",
+        "prior_visits": 4,
+        "prior_no_shows": 0,
+        "distance_band": "5_15km",
+        "age_band": "55-64",
+        "no_show": 1,
+        "p": 0.0837
+      },
+      {
+        "appointment_id": "A05696",
+        "lead_time_days": 7,
+        "weekday": "tue",
+        "hour": 13,
+        "visit_type": "routine_checkup",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 6,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "55-64",
+        "no_show": 1,
+        "p": 0.0844
+      },
+      {
+        "appointment_id": "A05431",
+        "lead_time_days": 6,
+        "weekday": "tue",
+        "hour": 14,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 3,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "45-54",
+        "no_show": 1,
+        "p": 0.0845
+      },
+      {
+        "appointment_id": "A02703",
+        "lead_time_days": 5,
+        "weekday": "wed",
+        "hour": 14,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 5,
+        "prior_no_shows": 0,
+        "distance_band": "5_15km",
+        "age_band": "18-24",
+        "no_show": 1,
+        "p": 0.0918
+      },
+      {
+        "appointment_id": "A00674",
+        "lead_time_days": 10,
+        "weekday": "thu",
+        "hour": 12,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 6,
+        "prior_no_shows": 1,
+        "distance_band": "5_15km",
+        "age_band": "25-34",
+        "no_show": 1,
+        "p": 0.0951
+      },
+      {
+        "appointment_id": "A03060",
+        "lead_time_days": 11,
+        "weekday": "tue",
+        "hour": 9,
+        "visit_type": "follow_up",
+        "booking_channel": "phone",
+        "reminder_sent": "yes",
+        "prior_visits": 5,
+        "prior_no_shows": 0,
+        "distance_band": "5_15km",
+        "age_band": "65+",
+        "no_show": 1,
+        "p": 0.0986
+      },
+      {
+        "appointment_id": "A05327",
+        "lead_time_days": 20,
+        "weekday": "thu",
+        "hour": 11,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 3,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "25-34",
+        "no_show": 1,
+        "p": 0.0987
+      }
+    ]
+  },
+  "learned_vs_rule": [
+    {
+      "column": "age_band",
+      "value": "18-24",
+      "reference": "45-54",
+      "rule": 0.45,
+      "learned": 0.2933
+    },
+    {
+      "column": "age_band",
+      "value": "25-34",
+      "reference": "45-54",
+      "rule": 0.3,
+      "learned": 0.0265
+    },
+    {
+      "column": "age_band",
+      "value": "35-44",
+      "reference": "45-54",
+      "rule": 0.1,
+      "learned": 0.0185
+    },
+    {
+      "column": "age_band",
+      "value": "45-54",
+      "reference": "45-54",
+      "rule": 0.0,
+      "learned": 0.0
+    },
+    {
+      "column": "age_band",
+      "value": "55-64",
+      "reference": "45-54",
+      "rule": -0.1,
+      "learned": -0.1043
+    },
+    {
+      "column": "age_band",
+      "value": "65+",
+      "reference": "45-54",
+      "rule": 0.15,
+      "learned": 0.1655
+    },
+    {
+      "column": "booking_channel",
+      "value": "online",
+      "reference": "phone",
+      "rule": 0.2,
+      "learned": 0.2162
+    },
+    {
+      "column": "booking_channel",
+      "value": "phone",
+      "reference": "phone",
+      "rule": 0.0,
+      "learned": 0.0
+    },
+    {
+      "column": "booking_channel",
+      "value": "in_person",
+      "reference": "phone",
+      "rule": -0.3,
+      "learned": -0.1878
+    },
+    {
+      "column": "distance_band",
+      "value": "under_5km",
+      "reference": "under_5km",
+      "rule": 0.0,
+      "learned": 0.0
+    },
+    {
+      "column": "distance_band",
+      "value": "5_15km",
+      "reference": "under_5km",
+      "rule": 0.15,
+      "learned": 0.024
+    },
+    {
+      "column": "distance_band",
+      "value": "15_30km",
+      "reference": "under_5km",
+      "rule": 0.35,
+      "learned": 0.3297
+    },
+    {
+      "column": "distance_band",
+      "value": "over_30km",
+      "reference": "under_5km",
+      "rule": 0.6,
+      "learned": 0.4347
+    }
+  ]
+}

@@ -456,6 +456,20 @@ go. Yes, my last message (the Phase 1 approval and Phase 2 plan request) was als
 ```
 </details>
 
+<details><summary>6. Phase 2 approval and Phase 3 plan request (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Good report. Commit Phase 2 with your proposed message, don't push, and show me the commit hash. Then bring me the Phase 3 plan (baseline and improved models, metrics, error analysis). In the plan, explain in plain words: how you will choose the decision threshold on the validation pile; how the 'best possible score' of 0.657 will be used as a leakage alarm; how you'll report the by-group results honestly given the small groups; and what you'll say if the complex model isn't clearly better than logistic regression. Wait for my 'go'.
+```
+</details>
+
+<details><summary>7. Phase 3 decision (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Good plan. Answers: 1 best F1 on validation. 2 no, skip the age_band experiment; put it in the README as possible future work. 3 yes, the Phase 2 approval and Phase 3 plan request were drafted with help from Claude in a separate chat; please log it. One change: the leakage alarm should allow for sampling luck, because the ceiling is calculated on the same finite pile and an honest model can slightly exceed it by chance. Alarm if a model exceeds that pile's ceiling by a margin of 0.03, or if any ROC-AUC is above 0.90. Explain the margin in the report. Also keep the experiment fast, and if the retraining test makes the suite much slower, mark it so it can be skipped with a flag but still runs by default in CI-style runs. Go. Tests first, show them failing then passing, explain with the real numbers in plain words, and don't commit until I approve.
+```
+</details>
+
 ### My decisions and corrections
 
 | Phase | Options I was given | What I decided or added |
@@ -463,6 +477,7 @@ go. Yes, my last message (the Phase 1 approval and Phase 2 plan request) was als
 | 0 Plan | New dependencies; who may call the endpoint; commits vs `CLAUDE.md`'s "do not commit"; files outside the new `ml/` app; committing the data and model; card placement | Approved scikit-learn, numpy, pandas, joblib with exact pins and no matplotlib / Jupyter; members only, throttled; one commit per phase after my approval, never push; approved the file list; commit data and model, **with a SHA-256 check before loading the pickle** and a README explanation (my addition); card on `/profile` below the wellness card; added an adjustable noise level and per-group metrics |
 | 1 Data | Columns, blank rates, default noise as proposed; after the run: keep noise 1.0 (ceiling 0.657 ROC-AUC) or strengthen the rule | Approved; added: the data card must say the group differences in the rule are arbitrary and not claims about real people, and the "best possible score" must be explained in plain words. After the report: **kept noise at 1.0** |
 | 2 Split and analysis | 70 / 15 / 15 stratified split; median + "was blank" column for numbers, `missing` category for blanks; `hour` as a category; analysis on the training pile only | Approved as proposed; asked again for tests first with fail-then-pass proof |
+| 3 Models | Threshold: best F1 or "at least 60% recall, best precision"; an extra model without `age_band` | **Best F1**; **skipped** the `age_band` experiment (README future work, Phase 7). **Changed the leakage alarm**: the plan alarmed at the pile's ceiling itself. The idea of a margin (an honest model can beat a ceiling measured on the same finite pile by luck, so alarm only above the ceiling **+ 0.03** or above 0.90) was **suggested by Claude in the separate chat**; I reviewed and approved it, and asked for the margin to be explained in the report. Asked for the slow retraining test to be skippable with a flag but run by default |
 
 ### What the checks caught
 
@@ -481,3 +496,16 @@ go. Yes, my last message (the Phase 1 approval and Phase 2 plan request) was als
 - **Phase 2, a wrong table order.** Reading the generated report showed the no-show-rate tables in a jumbled order (the
   grouping followed row order, not category order). The numbers were right; the order was fixed, and the "committed
   report matches the script" test caught the stale file until it was regenerated.
+- **Phase 3, rules checked by breaking them.** Three deliberate breaks were each caught by a test: choosing gradient
+  boosting whenever its interval merely reached above zero, removing the 0.03 leakage margin, and sending threshold
+  ties to the lower threshold. A planted copy of the answer (`reminder_sent` = "yes" exactly for no-shows) stops the
+  experiment with `LeakageAlarm`.
+- **Phase 3, the complex model did not earn its place.** Gradient boosting's validation PR-AUC advantage over logistic
+  regression was +0.016 with a 95% interval of -0.013 to +0.045, so by the rule fixed in advance logistic regression
+  was chosen. Gradient boosting also memorised more (train-validation ROC-AUC gap +0.087 vs +0.045).
+- **Phase 3, wording checked against the numbers.** Reading the generated report showed a few fixed sentences that
+  would silently become wrong if the data changed (for example "the confident false alarms are mostly long waits
+  without reminders"); they are now computed from the results, and two claims were softened ("nothing in the
+  columns tells them apart" became "little").
+- **Phase 3, speed.** The full experiment takes about 40 seconds; `ML_SKIP_SLOW=1` skips the 5 tests that need it
+  (they run by default).
