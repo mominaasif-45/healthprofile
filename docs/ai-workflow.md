@@ -512,6 +512,66 @@ Answers: 1 yes, hide the card when there is no profile, and note it in the READM
 ```
 </details>
 
+<details><summary>14. Phase 6 log mark and manual test (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Yes, my Phase 6 'go' message was also drafted with help from Claude in a separate chat. Please mark it in the log. I'm trying the card by hand now. Don't commit until I say so.
+```
+</details>
+
+<details><summary>15. Phase 6 approval after the manual test (drafted with help from Claude in a separate chat)</summary>
+
+```text
+I tried the card by hand: normal case, 91 check, keyboard only, light and dark. All fine. Please commit Phase 6, then show me the commit hash and git status
+```
+</details>
+
+<details><summary>16. Phase 7 plan request (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Phase 7 plan, please. Do not write or change anything yet. The Week 3 brief needs a README with: a feature checklist, architecture decisions, run and test commands, the metrics, dataset limits and bias, a sample request and response, and limitations. Please propose: (1) the README Week 3 section outline, in plain words, including the design choices we made (the card is hidden without a profile, logistic regression chosen over the fancier model, the pickle hash check, the threshold chosen on validation only, the test set used once, and the age_band idea left as future work); (2) which screenshots to take and who takes them, using the two card screenshots we already have; (3) the final validation list (migrations check, backend tests, frontend tests, lint, build) and how we name the tested commit; (4) what goes into docs/ai-workflow.md; (5) whether you recommend opening a Week 3 pull request, and what its base branch should be, since the Week 2 branch is not merged. Also tell me which of my messages need the 'drafted with help from Claude in a separate chat' mark. Don't commit anything.
+```
+</details>
+
+<details><summary>17. Phase 7 decision (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Go for Phase 7. The outline you proposed is approved as written.
+
+Answers to your questions:
+
+Messages 14, 15, 16 and 17 were all drafted with help from Claude in a separate chat. Please log and mark them.
+PR #3's base is main. I checked it on GitHub.
+A Week 3 pull request on top of the Week 2 branch is approved, but do not open it yet. First, show me the final validation results.
+I have added card-result.png, swagger-week3-request.png and swagger-week3-responses.png to docs/screenshots/week3/ next to the two existing ones (card-light.png and card-dark.png). Please use all five in the README screenshots table with a plain-words caption each. Please check with dir that all five files exist before you use them, and tell me if any is missing.
+Leave the 'My reflection' heading in docs/ai-workflow.md empty. I will write it myself in my own words. Leave a clearly marked placeholder for my Week 3 Loom link in the README.
+Please push feature/week3-ml-pipeline now as a backup (no force push, no pull request yet).
+
+How to work:
+
+Write the README section and the evidence file first, then show me the outline of the README section in your report.
+Run the whole validation list on the final commit with a clean working tree, without ML_SKIP_SLOW, and show me the real outputs.
+Tell me the tested commit hash only after the validation has passed on that exact commit.
+Commit with the message you proposed only after I approve your report. Do not push anything else and do not open the PR.
+
+Please report in plain words.
+```
+</details>
+
+<details><summary>18. Correction to the screenshot names (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Correction to point 4 of my last message: the two Swagger screenshots are actually named swagger-request.png and swagger-responses.png (not swagger-week3-request.png and swagger-week3-responses.png). Please run dir docs\screenshots\week3 to confirm the exact names and extensions, and use the real names in the README table. All five files exist: card-light, card-dark, card-result, swagger-request, swagger-responses.
+```
+</details>
+
+<details><summary>19. Phase 7 approval (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Approved. Message 18 was drafted with help from Claude in a separate chat; please mark it, and log this approval message (19) with the same mark. Commit Phase 7 with the message you proposed, then re-run all ten checks on that exact commit with a clean working tree. Show me the real outputs and give me the tested commit hash only if everything passes. Do not push anything and do not open the PR yet.
+```
+</details>
+
 ### My decisions and corrections
 
 | Phase | Options I was given | What I decided or added |
@@ -523,6 +583,7 @@ Answers: 1 yes, hide the card when there is no profile, and note it in the READM
 | 4 Artifact | Add `.gitattributes` (`*.joblib binary`, outside the approved file list); ship the model fitted on training rows only, or refit on training + validation | Approved `.gitattributes`; **training rows only**, so the shipped file is exactly the one the report describes; added: the README must say a production system would refit on all the data and re-derive the threshold |
 | 5 Endpoint | Members with no profile or a deactivated profile: allow, or refuse with 403; the throttle rate | **Allowed** (the endpoint never touches profile data); **30 requests per minute per member** |
 | 6 Dashboard card | Hide the card when there is no profile, or show it under "Create your profile"; add a side-menu link | **Hidden without a profile**, noted in the README as a design choice (Phase 7); **side-menu link added**; asked for manual browser steps (normal case, a 400, keyboard only, both themes, 429 and 503) |
+| 7 README and handoff | README outline; screenshots; validation list and how to name the tested commit; a Week 3 PR and its base | Approved the outline; took the screenshots myself (three new ones); confirmed PR #3's base is `main` on GitHub; **approved a stacked Week 3 PR on top of the Week 2 branch, but not opened until I have seen the final validation**; asked for a backup push first, an empty "My reflection" heading for me to write, and a marked placeholder for my Loom link |
 
 ### What the checks caught
 
@@ -585,3 +646,34 @@ Answers: 1 yes, hide the card when there is no profile, and note it in the READM
 - **Phase 6, lint.** The first lint run flagged one unused import in the new test file; removed.
 - **Phase 6, my manual check.** Before approving the commit, I tried the card by hand in the browser with both servers
   running: the normal case, the "91 days" check, the keyboard-only path, and light and dark themes. All worked.
+- **Phase 7, screenshot names.** My Phase 7 message gave two wrong file names (`swagger-week3-request.png` and
+  `swagger-week3-responses.png`). A `dir` check found the real names, `swagger-request.png` and
+  `swagger-responses.png`; no file was renamed. I then corrected my message (prompt 18), a second `dir` confirmed all
+  five `.png` files, and the README uses the real names.
+- **Phase 7, final validation.** The final validation results are in
+  [docs/evidence/week3.md](evidence/week3.md); the tested commit is named only after the full list passed on it.
+
+### Tools (Week 3)
+
+| Tool | What I used it for |
+|---|---|
+| **Claude (chat, separate)** | Drafting every prompt I sent in this session (each marked above), and suggesting the 0.03 leakage margin, which I reviewed and approved |
+| **Claude Code** (in the repo) | Reading the code, writing each phase plan, writing tests first, implementing, deliberately breaking code to prove the tests catch it, running every check, and committing each phase after my approval |
+| **My own checks** | `Get-FileHash` on the model file against `EXPECTED_SHA256`; trying the card by hand (normal case, the 91-days check, keyboard only, light and dark); confirming PR #3's base on GitHub; taking the screenshots |
+
+### Limits (stated honestly, Week 3)
+
+- **Synthetic data follows rules we wrote.** The models rediscover those rules; the metrics show the method working
+  and say nothing about real clinics or real people. The group differences in the rule are arbitrary.
+- **One split, one seed, 900-row validation and test piles.** The intervals in the model report show how much the
+  numbers could move; small groups (65+ and over 30 km on the test rows) are too small to judge, and in person is
+  only just above the limit.
+- **The shipped model is fitted on the training rows only**; a production system would refit on all the data and
+  re-derive the threshold.
+- **A `.joblib` file is a pickle.** The SHA-256 check proves the file is the one we built and reviewed; it does not make
+  an untrusted pickle safe. Safer formats (skops, ONNX) would need new dependencies.
+- **Not tried:** training without `age_band` to measure what removing a group input costs (left as future work).
+
+### My reflection
+
+

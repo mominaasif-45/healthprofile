@@ -147,8 +147,8 @@ models treat groups differently. Observed no-show rates in the file:
 Things to notice:
 
 * **Small groups.** `65+` (552 rows), `over_30km` (567) and `in_person` (645) are small. In a 15% test split
-  they have under 100 rows each, so their metrics will be noisy. Phase 3 reports group sizes next to every
-  per-group metric.
+  they have about 100 rows each (test split: 79, 96 and 104), so their metrics are noisy. Phase 3 reports group
+  sizes next to every per-group metric and marks groups under 100 rows or 20 no-shows as "too small to judge".
 * **Raw rates can hide the rule.** The rule gives `online` bookings +0.20 risk compared with `phone`.
   Yet online bookings have a slightly *lower* no-show rate (20.8% vs 21.4%), because online bookings get
   more reminders, which lower risk. This is a simple example of **confounding**: looking at one column at a
