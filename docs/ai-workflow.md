@@ -498,6 +498,20 @@ Answers: 1 yes, members without a profile or with a deactivated profile may use 
 ```
 </details>
 
+<details><summary>12. Phase 5 approval, push and Phase 6 plan request (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Good. Yes, my Phase 5 'go' message was drafted with help from Claude in a separate chat; please log it. Commit Phase 5 with your proposed message and show me the hash. Then push the branch feature/week3-ml-pipeline to origin as a backup (it's a new branch; don't open a PR, don't touch feature/week2-profiles-audit, and don't force anything). Then bring me the Phase 6 plan (the dashboard card). In the plan, explain: where the card goes on /profile; the form fields, their prefilled fictional values and how blanks are handled; how the card calls the API with the existing api() helper, including CSRF and the 401, 403, 429 and 503 states; the disclaimer and wording (no medical claims); accessibility and keyboard behaviour; and the Vitest tests. Wait for my 'go'.
+```
+</details>
+
+<details><summary>13. Phase 6 decision (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Answers: 1 yes, hide the card when there is no profile, and note it in the README as a design choice. 2 yes, add the side-menu link. 3 yes, my last message (the Phase 5 commit, the push and the Phase 6 plan request) was drafted with help from Claude in a separate chat; please log it. Go. Tests first, shown failing then passing. Run npm test, lint, build and the backend suite. Then give me exact manual steps to try the card in the browser myself with both servers running: the normal case, a 400 case, the keyboard-only path, light and dark theme, and how to see the 429 and 503 messages if that's practical. Don't commit until I approve.
+```
+</details>
+
 ### My decisions and corrections
 
 | Phase | Options I was given | What I decided or added |
@@ -508,6 +522,7 @@ Answers: 1 yes, members without a profile or with a deactivated profile may use 
 | 3 Models | Threshold: best F1 or "at least 60% recall, best precision"; an extra model without `age_band` | **Best F1**; **skipped** the `age_band` experiment (README future work, Phase 7). **Changed the leakage alarm**: the plan alarmed at the pile's ceiling itself. The idea of a margin (an honest model can beat a ceiling measured on the same finite pile by luck, so alarm only above the ceiling **+ 0.03** or above 0.90) was **suggested by Claude in the separate chat**; I reviewed and approved it, and asked for the margin to be explained in the report. Asked for the slow retraining test to be skippable with a flag but run by default |
 | 4 Artifact | Add `.gitattributes` (`*.joblib binary`, outside the approved file list); ship the model fitted on training rows only, or refit on training + validation | Approved `.gitattributes`; **training rows only**, so the shipped file is exactly the one the report describes; added: the README must say a production system would refit on all the data and re-derive the threshold |
 | 5 Endpoint | Members with no profile or a deactivated profile: allow, or refuse with 403; the throttle rate | **Allowed** (the endpoint never touches profile data); **30 requests per minute per member** |
+| 6 Dashboard card | Hide the card when there is no profile, or show it under "Create your profile"; add a side-menu link | **Hidden without a profile**, noted in the README as a design choice (Phase 7); **side-menu link added**; asked for manual browser steps (normal case, a 400, keyboard only, both themes, 429 and 503) |
 
 ### What the checks caught
 
@@ -559,3 +574,14 @@ Answers: 1 yes, members without a profile or with a deactivated profile may use 
   the existing name `AgeRangeEnum`; the schema now builds with no warnings.
 - **Phase 5, real examples only.** The Swagger response examples are real outputs of `noshow-1.0.0`; a test sends each
   example request and checks the response matches exactly.
+- **Phase 6, failing first.** Before the card existed, the new test file could not even import it ("Failed to resolve
+  import @/components/profile/NoShowDemoCard"); after writing it, all 23 tests passed.
+- **Phase 6, the checks checked.** Four deliberate breaks were each caught: sending "Not recorded" as an empty string
+  instead of `null` (2 tests failed), keeping a stale result after a field changed, removing `aria-live` from the
+  result area, and dropping the 429 message.
+- **Phase 6, rounding.** The card rounds percentages through whole basis points as a precaution against floating-point
+  surprises, and a test covers 0.0505 → "5.1%". When checked in Node, plain rounding also gave 5.1% for this value, so
+  this is a safeguard, not a bug that was found.
+- **Phase 6, lint.** The first lint run flagged one unused import in the new test file; removed.
+- **Phase 6, my manual check.** Before approving the commit, I tried the card by hand in the browser with both servers
+  running: the normal case, the "91 days" check, the keyboard-only path, and light and dark themes. All worked.

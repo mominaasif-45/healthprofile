@@ -206,6 +206,28 @@ export type AuditEvent = {
   request_id: string | null;
 };
 
+// ---- educational ML demo: POST /api/ml/v1/no-show/predict/ (fictional appointment in, chance out; null = blank)
+export type NoShowRequest = {
+  lead_time_days: number;
+  weekday: string;
+  hour: number;
+  visit_type: string;
+  booking_channel: string;
+  reminder_sent: string | null;
+  prior_visits: number | null;
+  prior_no_shows: number | null;
+  distance_band: string | null;
+  age_band: string | null;
+};
+
+export type NoShowResponse = {
+  prediction: "likely_no_show" | "likely_attend";
+  probability: number;
+  threshold: number;
+  model_version: string;
+  disclaimer: string;
+};
+
 // ---- admin views (an allow-list: no date of birth, allergies, notes or full phone numbers)
 export type AdminAuditEvent = AuditEvent & { actor: number | null; actor_role: string };
 
