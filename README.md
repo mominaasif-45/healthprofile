@@ -970,7 +970,7 @@ Week 1: https://www.loom.com/share/7f3a96d221f1415b9c2abe2070b3f38e
 
 Week 2: https://www.loom.com/share/5d16ef5c30ba4496a1de8ce16270edba
 
-Week 3: **[PLACEHOLDER: add the Week 3 Loom link here]**
+Week 3: https://www.loom.com/share/9d6433ae55664ab89026f9e7df4299b4
 
 ## Limitations
 

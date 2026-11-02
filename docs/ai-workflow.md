@@ -572,6 +572,31 @@ Approved. Message 18 was drafted with help from Claude in a separate chat; pleas
 ```
 </details>
 
+<details><summary>20. Push and PR draft (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Push feature/week3-ml-pipeline to GitHub now (no force push). Then show me git status and git log --oneline -3. Do not open a PR. Please also draft the PR title and description for me to paste on GitHub later: base feature/week2-profiles-audit, stacked on #3 (please merge #3 first), the tested commit, the validation summary in a short table, and links to the README section and docs/evidence/week3.md. Leave a placeholder for my Loom link.
+```
+</details>
+
+<details><summary>21. Loom link and reflection (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Here is my Week 3 Loom link: https://www.loom.com/share/9d6433ae55664ab89026f9e7df4299b4
+
+Please:
+
+Replace the Week 3 Loom placeholder in the README with this link.
+I have written my reflection myself under 'My reflection' in docs/ai-workflow.md and saved it. Do not edit, rewrite or improve it; only commit it as it is.
+Log this message in docs/ai-workflow.md as the next prompt, marked 'drafted with help from Claude in a separate chat'.
+Before committing, show me git diff --stat and confirm that only documentation files changed, with no code.
+After I approve, commit with the message docs: add Week 3 Loom link and reflection.
+Re-run python manage.py makemigrations --check --dry-run, python -m pytest, npm test, npm run lint and npm run build on that exact commit with a clean tree, and show me the real outputs. Then give me the final tested commit hash.
+Rewrite the PR description with the final hash and the Loom link in both places, and update the links to point to the final hash.
+Do not push and do not open the PR until I approve.
+```
+</details>
+
 ### My decisions and corrections
 
 | Phase | Options I was given | What I decided or added |
@@ -675,5 +700,20 @@ Approved. Message 18 was drafted with help from Claude in a separate chat; pleas
 - **Not tried:** training without `age_band` to measure what removing a group input costs (left as future work).
 
 ### My reflection
+**1. What did you learn about building an ML pipeline?**
+
+I learned that data should be split into training, validation, and testing sets before analyzing it. Data leakage can give misleading results because the model gets information it should not have. I also learned that accuracy is not always reliable, especially when the data is imbalanced. Choosing the right threshold helps balance precision and recall.
+
+**2. What did the AI get wrong or suggest, and how did you or the tests catch it?**
+
+Claude suggested using a 0.03 margin for the data leakage alarm. I reviewed the suggestion, approved it, and added it to the project log. The tests also used a planted copy of the answer to check whether the leakage alarm could detect it. This taught me that AI suggestions should be checked and tested before being accepted.
+
+**3. What would you do differently next time?**
+
+Next time, I would try training the model without the age band feature to see how much it affects the results. I would also compare the models more carefully and spend more time understanding the evaluation results before choosing the final model.
+
+**4. What still confuses you?**
+
+I still find it a little confusing how to choose the best threshold and balance precision and recall. In my project, the model had 29.5% precision and 50.8% recall at a threshold of 0.22. I learned that lowering the threshold catches more missed appointments but can also create more wrong predictions. I also want to understand better how to decide which ML model is best for a problem.
 
 
