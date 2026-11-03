@@ -147,3 +147,34 @@ def test_committed_report_and_metrics_match_a_fresh_run(results):
     assert committed == json.loads(json.dumps(results))
     report = experiment.REPORT_PATH.read_bytes().replace(b"\r\n", b"\n").decode("utf-8")
     assert report == experiment.render(results)
+
+
+# ---------------------------------------------------------------- the reminder trade-off at the threshold (mentor review)
+# Made-up counts, deliberately unlike the real ones: the paragraph must be computed, not typed in.
+TOY_SCORES = {"tp": 7, "fp": 13, "fn": 5, "tn": 15, "precision": 0.35, "recall": 7 / 12, "threshold": 0.3}
+
+
+def test_reminder_paragraph_is_computed_from_the_counts():
+    text = experiment.reminder_tradeoff(TOY_SCORES)
+    for part in [
+        "**What the 0.30 line means.**",
+        "chosen on the validation pile",
+        "suggests an extra reminder, not a certain no-show",
+        "flagged 20 of 40 appointments",
+        "7 were real no-shows (precision 35.0%)",
+        "the other 13 would get a reminder they did not need",
+        "caught 7 of the 12 no-shows (recall 58.3%)",
+        "so 5 missed appointments would get no extra reminder",
+    ]:
+        assert part in text, part
+    assert "patient" not in text.lower()
+
+
+def test_committed_report_explains_the_reminder_trade_off():
+    """Fast check on the committed files: section 6 carries the paragraph built from metrics.json."""
+    results = json.loads(experiment.METRICS_PATH.read_text(encoding="utf-8"))
+    expected = experiment.reminder_tradeoff(results["test"][results["chosen"]])
+    report = experiment.REPORT_PATH.read_text(encoding="utf-8").replace("\r\n", "\n")
+    section_6 = report.split("## 6. The decision threshold")[1].split("## 7.")[0]
+    assert expected in section_6
+    assert "patient" not in report.lower()

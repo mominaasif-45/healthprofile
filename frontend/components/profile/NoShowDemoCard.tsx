@@ -250,11 +250,13 @@ export function NoShowDemoCard() {
             <p style={{ margin: "0 0 8px" }}>
               {above ? (
                 <>
-                  Above the {percent(result.threshold)} line, so the demo flags it as <strong>likely to be missed</strong>.
+                  Above the {percent(result.threshold)} line: this suggests an <strong>extra reminder</strong>, not a
+                  certain no-show.
                 </>
               ) : (
                 <>
-                  Below the {percent(result.threshold)} line, so the demo marks it as <strong>likely to be attended</strong>.
+                  Below the {percent(result.threshold)} line: <strong>no extra reminder</strong> suggested. This is not a
+                  promise that this fictional appointment will be attended.
                 </>
               )}
             </p>

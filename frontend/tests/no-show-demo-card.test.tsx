@@ -97,7 +97,10 @@ describe("No-show demo card", () => {
     await user.click(checkButton());
 
     expect(await within(result).findByText("52.8% chance this fictional appointment is missed")).toBeInTheDocument();
-    expect(within(result).getByText(/Above the 22% line/)).toHaveTextContent("likely to be missed");
+    const verdict = within(result).getByText(/Above the 22% line/);
+    expect(verdict).toHaveTextContent("Above the 22% line: this suggests an extra reminder, not a certain no-show.");
+    expect(verdict).not.toHaveTextContent("likely to be missed");
+    expect(result).not.toHaveTextContent(/patient/i);
     expect(within(result).getByText(/Model noshow-1\.0\.0/)).toBeInTheDocument();
     expect(within(result).getByText(DISCLAIMER)).toBeInTheDocument();
     const meter = within(result).getByRole("meter", { name: "Chance of a missed appointment" });
@@ -106,13 +109,18 @@ describe("No-show demo card", () => {
     expect(meter).toHaveAttribute("aria-valuemax", "100");
   });
 
-  it("words a low chance as likely to be attended", async () => {
+  it("words a low chance as no extra reminder, not a promise of attendance", async () => {
     server.reply = async () => LIKELY_ATTENDED;
     const user = userEvent.setup();
     render(<NoShowDemoCard />);
     await user.click(checkButton());
     expect(await screen.findByText("5.1% chance this fictional appointment is missed")).toBeInTheDocument();
-    expect(screen.getByText(/Below the 22% line/)).toHaveTextContent("likely to be attended");
+    const verdict = screen.getByText(/Below the 22% line/);
+    expect(verdict).toHaveTextContent(
+      "Below the 22% line: no extra reminder suggested. This is not a promise that this fictional appointment will be attended.",
+    );
+    expect(verdict).not.toHaveTextContent("likely to be attended");
+    expect(screen.getByRole("region", { name: "Demo result" })).not.toHaveTextContent(/patient/i);
   });
 
   it("sends null for blanks: 'Not recorded' reminder and both earlier fields left empty", async () => {

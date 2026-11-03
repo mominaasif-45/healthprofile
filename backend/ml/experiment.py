@@ -151,6 +151,24 @@ def _signed(value):
     return f"{value:+.3f}"
 
 
+def reminder_tradeoff(scores):
+    """
+    Plain-words meaning of the frozen threshold, built from one pile's counts (the test pile in the report):
+    flags that would send an unneeded reminder (false positives) vs no-shows that would get none (false negatives).
+    """
+    tp, fp, fn, tn = scores["tp"], scores["fp"], scores["fn"], scores["tn"]
+    return (
+        f"**What the {scores['threshold']:.2f} line means.** It is a decision threshold chosen on the validation pile "
+        "(best F1), then frozen. It is not a prediction that the person will miss: an estimate above it suggests an "
+        "extra reminder, not a certain no-show. "
+        f"On the test pile the model flagged {tp + fp} of {tp + fp + fn + tn} appointments: {tp} were real no-shows "
+        f"(precision {_pct(scores['precision'])}), and the other {fp} would get a reminder they did not need. "
+        f"It caught {tp} of the {tp + fn} no-shows (recall {_pct(scores['recall'])}), so {fn} missed appointments "
+        "would get no extra reminder. A lower line catches more no-shows but sends more unneeded reminders; a higher "
+        "line does the opposite."
+    )
+
+
 def _interval(metric):
     if metric["value"] is None:
         return "n/a"
@@ -392,6 +410,8 @@ the validation pile:
 
 Lower thresholds catch more no-shows at the price of more false alarms. In a real clinic the cost of each kind of
 mistake would decide; for this demo, the best F1 is a neutral choice.
+
+{reminder_tradeoff(test)}
 
 ## 7. Final exam: the test pile (used once)
 

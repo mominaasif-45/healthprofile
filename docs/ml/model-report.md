@@ -125,6 +125,8 @@ the validation pile:
 Lower thresholds catch more no-shows at the price of more false alarms. In a real clinic the cost of each kind of
 mistake would decide; for this demo, the best F1 is a neutral choice.
 
+**What the 0.22 line means.** It is a decision threshold chosen on the validation pile (best F1), then frozen. It is not a prediction that the person will miss: an estimate above it suggests an extra reminder, not a certain no-show. On the test pile the model flagged 322 of 900 appointments: 95 were real no-shows (precision 29.5%), and the other 227 would get a reminder they did not need. It caught 95 of the 187 no-shows (recall 50.8%), so 92 missed appointments would get no extra reminder. A lower line catches more no-shows but sends more unneeded reminders; a higher line does the opposite.
+
 ## 7. Final exam: the test pile (used once)
 
 | Model | ROC-AUC | PR-AUC | Brier | Threshold | Precision | Recall | F1 | Balanced acc. | Accuracy |
