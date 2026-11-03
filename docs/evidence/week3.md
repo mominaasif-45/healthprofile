@@ -15,6 +15,10 @@ A file cannot contain the hash of the commit that adds it, so:
   changes** against `493a2d1` (step 1), only the documentation and screenshots.
 * After the Phase 7 commit, the **same list is run again on that exact commit with a clean working tree**. Only if it
   passes is that commit's hash named as the **tested commit**, in the pull request description.
+* **Update (4 November 2026):** the Week 2 contact deletion race fix was merged into this branch afterwards, and the
+  whole list was run again on **the merge commit**. Those results are the current ones: see
+  [After the Week 2 race fix](#after-the-week-2-race-fix) at the end of this file. The outputs below are kept as the
+  record of the earlier run.
 
 ## Final validation list
 
@@ -107,3 +111,24 @@ Each phase also broke its own code on purpose to check that the tests catch it (
 * `EXPECTED_SHA256` in `backend/ml/artifact.py` compared with PowerShell `Get-FileHash` on the model file: matches.
 * The dashboard card in the browser with both servers running: the normal case, the "91 days" quick check, the
   keyboard-only path, and light and dark themes.
+
+## After the Week 2 race fix
+
+The PR #4 review asked for the inherited Week 2 contact deletion race to be fixed before the stack is merged.
+The fix (`dbe41db` on `feature/week2-profiles-audit`) was brought into this branch with a **merge, not a rebase**.
+Only `README.md` conflicted (two test-count lines); both sides were kept. No Week 3 code changed.
+
+The full list was run again on **the merge commit**, with a clean working tree and `ML_SKIP_SLOW` not set,
+on 4 November 2026. The commit that adds this section changes only documentation.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | `python manage.py makemigrations --check --dry-run` | `No changes detected` |
+| 2 | `python manage.py check` | `System check identified no issues (0 silenced).` |
+| 3 | `python manage.py spectacular --validate` | no warnings or errors (exit 0) |
+| 4 | `python -m pytest` (full) | `427 passed in 108.61s (0:01:48)` (278 Week 1–2 + 149 Week 3) |
+| 5 | `python -m ml.train --check` | predictions, labels, metadata and bytes identical; `OK: the committed artifact is reproduced.` |
+| 6 | Rebuild the dataset, analysis and model report, then `git diff --exit-code` | no changes (exit 0) |
+| 7 | `npm test` | `Test Files 6 passed (6)`, `Tests 47 passed (47)` |
+| 8 | `npm run lint` | exit 0, no problems reported |
+| 9 | `npm run build` | `✓ Compiled successfully`, `✓ Generating static pages (11/11)` |

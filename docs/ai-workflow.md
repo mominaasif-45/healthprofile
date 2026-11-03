@@ -636,6 +636,44 @@ Do not push and do not open the PR until I approve.
 ```
 </details>
 
+**Follow-up session (2026-11-04): merging the Week 2 race fix.** My mentor's review of PR #4 asked for the inherited
+Week 2 contact deletion race to be fixed before the stack is merged. After the fix was pushed on the Week 2 branch,
+prompts 22 to 24 were sent in a new Claude Code session on this branch. At my request, Claude Code made the merge (not a
+rebase) and pushed this branch as a backup.
+
+<details><summary>22. Merge the Week 2 race fix (drafted with help from Claude in a separate chat)</summary>
+
+```text
+New task on the Week 3 branch (PR #4). My mentor’s review on PR #4 said to fix the contact deletion race on the Week 2 branch before merging the stack. That fix is now pushed as dbe41db58f88afa52f6faad648d14099dbab1aa6 on origin/feature/week2-profiles-audit. Please bring it into feature/week3-ml-pipeline with a MERGE, not a rebase.
+
+Steps:
+
+Run git fetch, then show me what the merge will bring in before you merge.
+Do the merge. I expect conflicts in README.md and docs/ai-workflow.md. If there are conflicts, stop and show me each one and your proposed resolution before you finish the merge. Never drop either side: keep the Week 2 follow-up text and my Week 3 text. Update the test counts correctly (Week 2 is now 278, and Week 3 should become 427 backend, 47 frontend).
+After the merge, run all of these on that exact commit with a clean tree, and show me the real outputs: makemigrations --check --dry-run, manage.py check, spectacular --validate, python -m pytest (full, without ML_SKIP_SLOW), python -m ml.train --check, the rebuild of the data, analysis and reports followed by git diff --exit-code, npm test, npm run lint and npm run build.
+Add the results to docs/evidence/week3.md as a short ‘After the Week 2 race fix’ section, with the final commit hash described as ‘the merge commit’, and log this message as the next prompt, marked ‘drafted with help from Claude in a separate chat’.
+Draft the updated PR #4 description with the new final hash.
+Do not push until I approve.
+```
+</details>
+
+<details><summary>23. Merge resolutions approved (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Go with all of your proposed resolutions. Before you commit the merge, run a search for leftover conflict markers (<<<<<<<, =======, >>>>>>>) in the whole repo and show me that it finds none. Show me the git diff of README.md. Commit the merge with the message you proposed. Then run the full list on that exact merge commit with a clean tree and show me the real outputs. Then, after my approval, add the evidence section and log this message as prompt 22 (marked ‘drafted with help from Claude in a separate chat’) in a second docs-only commit. Draft the updated PR #4 description. Do not push.
+```
+</details>
+
+<details><summary>24. Evidence approved, commit and backup push (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Approved: use the evidence section as drafted, and also update the ‘Which commit was tested’ note at the top of docs/evidence/week3.md to point to it. Log the merge request as prompt 22 and this message as prompt 23, both marked ‘drafted with help from Claude in a separate chat’. Make the docs-only commit, show me git diff --stat and confirm only documentation changed. Then push feature/week3-ml-pipeline (no force) as a backup and show me git status and the full hash. Do not fill in the PR description yet: more evidence is coming, so I will ask you for the PR description once at the end. Also tell me whether the description of PR #3 on GitHub is likely to mention ‘275’ tests anywhere that I should update (check the README review-response table and any text you wrote for it).
+```
+</details>
+
+When the numbering in prompts 23 and 24 overlapped, Claude Code asked how to log them, and I chose to log all three
+messages as 22 to 24.
+
 ### My decisions and corrections
 
 | Phase | Options I was given | What I decided or added |
