@@ -4,9 +4,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CompletionBadge } from "@/components/Completion";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { IconCheck, IconClock, IconLock, IconShield, IconTarget, IconUser, IconUsers } from "@/components/Icons";
+import { IconCheck, IconClock, IconLock, IconPulse, IconShield, IconTarget, IconUser, IconUsers } from "@/components/Icons";
 import { ContactsCard } from "@/components/profile/ContactsCard";
 import { DemographicsCard } from "@/components/profile/DemographicsCard";
+import { NoShowDemoCard } from "@/components/profile/NoShowDemoCard";
 import { WellnessCard } from "@/components/profile/WellnessCard";
 import { Shell } from "@/components/Shell";
 import { ThemeToggle } from "@/components/Theme";
@@ -138,6 +139,7 @@ export default function ProfilePage() {
         { href: "#profile", label: "My profile", icon: <IconUser />, current: true },
         { href: "#contacts", label: "Emergency contacts", icon: <IconUsers /> },
         { href: "#wellness", label: "Wellness goals", icon: <IconTarget /> },
+        { href: "#no-show-demo", label: "No-show demo", icon: <IconPulse /> },
         { href: "/activity", label: "My activity", icon: <IconClock /> },
         { href: "#privacy", label: "Privacy and security", icon: <IconShield /> },
       ]}
@@ -201,6 +203,8 @@ export default function ProfilePage() {
               readOnly={deactivated}
               onSaved={afterChange}
             />
+            {/* Educational demo on fictional appointments: never uses the profile, so it stays usable when deactivated. */}
+            <NoShowDemoCard />
 
             {!deactivated && (
               <section className="card danger-zone" aria-labelledby="danger-title">

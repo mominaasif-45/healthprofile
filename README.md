@@ -11,6 +11,214 @@ All data in this project is synthetic.
 > **Demo environment.** Every profile is synthetic. No real patient data. Wellness goals only,
 > never diagnoses or medical advice.
 
+## What is new in Week 3
+
+Week 3 ("Machine Learning Pipeline and Prediction API") adds an **educational demo**: a model that estimates the
+chance that a **fictional** appointment is missed (a "no-show"). It is trained only on synthetic data made by a seeded
+script, is served by a versioned API endpoint, and is shown in a clearly labelled card on the member dashboard.
+
+> **Educational demo on synthetic data.** Not medical advice, not a diagnosis, and not a prediction about any real
+> person or appointment. The model never reads profile data.
+
+Details live in three generated documents: the [data card](docs/ml/data-card.md) (where the data comes from and its
+limits), the [analysis](docs/ml/eda.md) (training data only) and the [model report](docs/ml/model-report.md)
+(every metric, group result and error). Real command output: [docs/evidence/week3.md](docs/evidence/week3.md).
+
+### Feature checklist (Week 3)
+
+- [x] **Synthetic data with provenance, licence, schema and limits**: 6,000 appointments from a seeded generator with an
+  adjustable noise level ([`ml/data/generate.py`](backend/ml/data/generate.py), [data card](docs/ml/data-card.md))
+- [x] **Exploratory analysis, missing values, train / validation / test split, no leakage**: split first (70/15/15,
+  stratified), fill-in values learned from training rows only, analysis on training rows only
+  ([`ml/features.py`](backend/ml/features.py), [`ml/analysis.py`](backend/ml/analysis.py))
+- [x] **Baseline and improved models compared with imbalance-aware metrics, plus error analysis**: baseline, logistic
+  regression and gradient boosting; PR-AUC, recall, precision, F1, balanced accuracy, calibration, bootstrap intervals
+  ([`ml/experiment.py`](backend/ml/experiment.py), [model report](docs/ml/model-report.md))
+- [x] **Metrics by group** (age band, booking channel, distance band) with intervals and small-group warnings
+- [x] **One scikit-learn Pipeline artifact** (preprocessing + model in one file) with metadata
+  ([`ml/artifacts/`](backend/ml/artifacts/))
+- [x] **Reproducible training script** with fixed seeds and pinned dependencies; `--check` rebuilds and compares
+  ([`ml/train.py`](backend/ml/train.py))
+- [x] **Versioned inference endpoint** `POST /api/ml/v1/no-show/predict/` that validates the input schema, rejects
+  malformed, out-of-range and unknown fields, and returns the prediction, probability and model version
+- [x] **Dashboard card** on `/profile`, labelled as an educational demo, never medical advice
+- [x] **Week 1 and Week 2 still work**: all 278 earlier backend tests and 24 frontend tests still pass
+- [x] **Tests**: 149 new backend tests (427 in total) and 23 new frontend tests (47 in total)
+- [x] **Trade-offs documented** (below)
+
+### How it fits together
+
+```
+generate.py ──► appointments.csv ──► split (features.py) ──► analysis.py ──► eda.md
+                                         │
+                                         ▼
+                              experiment.py (fit on train, choose on validation, test once)
+                                         │                         └──► model-report.md + metrics.json
+                                         ▼
+                              train.py ──► noshow-1.0.0.joblib + noshow-1.0.0.json
+                                                   │
+                                                   ▼  SHA-256 checked before loading
+              Dashboard card ──► POST /api/ml/v1/no-show/predict/ ──► predictor.py (loaded once)
+```
+
+| File in `backend/ml/` | What it does |
+|---|---|
+| `data/generate.py` | Seeded generator: invents appointments and decides `no_show` from a written rule plus noise |
+| `features.py` | The input columns, the split, and the preprocessing (fill blanks, mark blanks, scale, one-hot) |
+| `analysis.py` | Writes [`docs/ml/eda.md`](docs/ml/eda.md) from the training rows only |
+| `models.py`, `evaluate.py`, `experiment.py` | The three models, the metrics and rules, and the experiment that writes the model report |
+| `artifact.py`, `train.py` | Save and **checksum-verified** load of the model file; the reproducible training script |
+| `serializers.py`, `predictor.py`, `views.py`, `urls.py` | The API: validation from the model's schema, loading once, the endpoint |
+
+### Design choices and trade-offs (Week 3)
+
+| Decision | Why | Trade-off |
+|---|---|---|
+| **Synthetic data from a rule we wrote, plus noise** | No real data is allowed; a written rule lets us know the best possible score (ROC-AUC 0.657) and catch leakage | The scores show that the method works; they say nothing about real clinics |
+| **Split first** (70/15/15, stratified, seed 42); preprocessing inside the Pipeline | Fill-in values and scaling are learned from training rows only, so validation and test rows never leak in (tested) | One fixed split; the intervals show how much the numbers could move |
+| **No class weights** | The API returns a probability, which should mean what it says; class weights would push every probability up | Class imbalance is handled by the threshold instead |
+| **Threshold chosen on validation only** (best F1, ties go to the higher threshold), then frozen at **0.22** | The test rows play no part in any choice | F1 is a neutral choice for a demo; a real clinic would set it from the cost of each kind of mistake |
+| **Test set used once**, after the model and every threshold were fixed | So the final numbers are an honest exam, not something we tuned towards | Only one look; no second chance on the same rows |
+| **Logistic regression chosen over gradient boosting** | The rule was fixed in advance: the more complex model must beat logistic regression with a 95% bootstrap interval above zero. It did not (PR-AUC +0.016, interval −0.013 to +0.045) | Possibly a little performance left unused, in exchange for a simpler, explainable model that memorised less |
+| **Leakage alarm**: stop if a model beats its pile's best possible score by more than **0.03**, or any ROC-AUC is above 0.90 | A score too good to be true usually means the answer leaked into the inputs. The margin allows for luck on a 900-row pile (the margin was suggested by Claude in a separate chat and approved by me) | A small leak could hide inside the margin |
+| **Model fitted on the 4,200 training rows only** | The shipped file is exactly the one the model report describes | A production system would refit on all the data and re-derive the threshold |
+| **Pickle hash check**: the model file's SHA-256 must equal `EXPECTED_SHA256` in reviewed code **before** it is unpickled | A `.joblib` file is a pickle, and loading a pickle can run code hidden inside it. The bytes are read once, checked, then loaded from memory, so the file cannot be swapped in between; the scikit-learn version must also match. `.gitattributes` marks `*.joblib` as binary so git never changes its bytes | The checksum proves "this is the file we built"; it does not make an untrusted pickle safe. Safer formats (skops, ONNX) would need new dependencies |
+| **Dataset and model committed** | A clean clone works straight away; `python -m ml.train --check` proves the committed files are reproduced | A new model means a reviewed change to `EXPECTED_SHA256` |
+| **Validation built from the model's metadata schema**; unknown fields rejected; whole numbers must be whole numbers | The API and the model cannot disagree about the inputs; nobody can smuggle in the answer column | Stricter than DRF's defaults (`"21"` and `21.0` are refused) |
+| **Model loaded once, on the first request**; a failed load gives **503** and is not remembered | Fast after the first request; a fixed file works again without a restart; other routes keep working | The first request is slower |
+| **Members only, with CSRF and a 30 per minute throttle**; nothing stored, audited or logged | The inputs are fictional and nothing changes, so there is nothing to audit (and no values may be logged) | No record of how the demo is used |
+| **`v1` in the URL, `model_version` in the response** | The URL versions the request/response shape; a retrained model changes `model_version`, not the URL | Two version numbers to explain |
+| **The card is hidden when the member has no profile** | It sits below the wellness card, which only exists once there is a profile. It stays usable on a deactivated profile, because it never uses profile data | A member must create a profile before trying the demo |
+| `ml` is not in `INSTALLED_APPS`; the pickle refers to helpers in `ml.features` | No database models or commands are needed | The model file can only be loaded where the `ml` package exists |
+
+### Metrics
+
+**Final exam: the test rows (900, used once).** The threshold for each model was chosen on validation.
+
+| Model | ROC-AUC | PR-AUC | Recall | Precision | F1 | Balanced accuracy |
+|---|---|---|---|---|---|---|
+| Baseline (everyone gets 20.8%) | 0.500 | 0.208 | 100.0% | 20.8% | 0.344 | 50.0% |
+| **Logistic regression (chosen)** | **0.617** | **0.340** | **50.8%** | **29.5%** | **0.373** | **59.5%** |
+| Gradient boosting | 0.620 | 0.316 | 46.5% | 29.4% | 0.360 | 58.6% |
+
+In plain words: the chosen model catches about half of the fictional no-shows (95 of 187), and about 3 in 10 of its
+flags are right. That is modest on purpose: even a model that knew the rule exactly could only reach ROC-AUC 0.639 on
+these rows, because the noise and the final coin flip cannot be predicted.
+
+| Comparison on validation (PR-AUC) | Difference | 95% interval | Clearly better? |
+|---|---|---|---|
+| Logistic regression vs baseline | +0.100 | +0.062 to +0.158 | yes |
+| Gradient boosting vs baseline | +0.116 | +0.070 to +0.178 | yes |
+| Gradient boosting vs logistic regression | +0.016 | −0.013 to +0.045 | **no**, so logistic regression was chosen |
+
+The probabilities are honest: on the test rows, the predicted and actual no-show rates differ by at most 7.8 points in
+any band of 90 rows. No leakage alarm went off (best possible ROC-AUC: validation 0.637, test 0.639).
+All numbers: [docs/ml/model-report.md](docs/ml/model-report.md) and
+[`backend/ml/reports/metrics.json`](backend/ml/reports/metrics.json).
+
+### Dataset limits and bias
+
+- **Synthetic, from rules we wrote.** Every group difference in the rule (for example +0.45 for age 18–24, +0.60 for
+  over 30 km) is an **arbitrary choice** made to give the bias checks something to find. None of it is a claim about
+  real people or populations.
+- **Class imbalance**: 20.8% no-shows. "Everyone attends" would be 79.2% accurate and useless, so accuracy is not used
+  to judge the models.
+- **Small groups**: on the test rows, 65+ (79 rows) and over 30 km (96 rows) are marked "too small to judge"; in
+  person (104 test rows, 93 validation rows) is only just above the limit, so its results are noisy too.
+- **Missing values with a pattern**: distance is blank 13.8% of the time for phone bookings and 4.7% otherwise, so a
+  blank partly means "booked by phone".
+- **What the group check found** (test rows): the model raises false alarms for 44.9% of attended appointments 15–30 km
+  away vs 24.2% for 5–15 km, and the intervals do not overlap. Both groups miss about 22% of the time, so the model is
+  flagging people **because of their distance**, as the rule told it to. This is how bias in data becomes bias in a
+  model. Differences by age band and booking channel were **not** clear (the intervals overlap).
+
+Full details: [data card](docs/ml/data-card.md) and section 8 of the [model report](docs/ml/model-report.md).
+
+### Run, reproduce and test (Week 3)
+
+Install the pinned packages again after pulling (Week 3 adds scikit-learn, numpy, pandas and joblib):
+
+```bash
+cd backend
+pip install -r requirements.txt
+
+python -m ml.data.generate --seed 42 --rows 6000 --noise 1.0   # rebuild the dataset (identical file)
+python -m ml.analysis                                           # rebuild docs/ml/eda.md
+python -m ml.experiment                                         # rebuild the model report and metrics.json (~40 s)
+python -m ml.train --check                                      # rebuild the model in memory and compare; writes nothing
+python -m ml.train                                              # write the model files (then review EXPECTED_SHA256)
+
+python -m pytest                    # 427 passed (278 Week 1–2 + 149 Week 3), about 2 minutes
+ML_SKIP_SLOW=1 python -m pytest     # skips the 7 slow retraining tests locally (they run by default)
+```
+
+```bash
+cd frontend
+npm test       # 47 passed (24 Week 1–2 + 23 Week 3)
+```
+
+Then start both servers as in "Run it locally" below, sign in as a member, create a profile and use the
+**No-show demo** card (or the side-menu link).
+
+| New test file | What it proves |
+|---|---|
+| `test_ml_data.py` | The generator is reproducible; schema, ranges and missing values match the data card; no column leaks the answer; the noise setting works; the committed CSV is exactly what the generator makes |
+| `test_ml_split.py` | The split is 70/15/15, stratified and reproducible; fill-in values and scaling come from training rows only; changing validation or test rows changes nothing learned |
+| `test_ml_models.py` | Metrics and the threshold match hand calculations; the leakage alarm catches a planted copy of the answer; the selection rule; group counts; the committed report matches a fresh run |
+| `test_ml_artifact.py` | A tampered model file is refused **before unpickling**; missing files and a different scikit-learn version are refused; the metadata is correct; retraining gives identical predictions |
+| `test_ml_api.py` | Who may call the endpoint; every kind of bad input gives 400; nothing is echoed, logged or stored; the model loads once; 503 when it cannot load; the 30 per minute throttle; the Swagger docs |
+| `frontend/tests/no-show-demo-card.test.tsx` | The request body (blank = `null`), the quick checks, server errors, the 401 / 403 / 429 / 503 messages, the keyboard path, the announced result, no medical wording, and the card's place on the page |
+
+### Sample request and response (real output)
+
+`POST /api/ml/v1/no-show/predict/` as a signed-in member (JWT cookie + `X-CSRFToken` header):
+
+```json
+{"lead_time_days": 21, "weekday": "mon", "hour": 9, "visit_type": "new_visit",
+ "booking_channel": "online", "reminder_sent": "no", "prior_visits": 3,
+ "prior_no_shows": 1, "distance_band": "15_30km", "age_band": null}
+```
+
+**200**:
+
+```json
+{"prediction": "likely_no_show", "probability": 0.5279, "threshold": 0.22,
+ "model_version": "noshow-1.0.0",
+ "disclaimer": "Educational demo trained on synthetic data. Not medical advice, not a diagnosis, and not a prediction about any real person or appointment."}
+```
+
+The same request with `lead_time_days: 120`, `weekday: "sunday"`, `hour` left out and an extra `no_show: 1` gives
+**400**, naming every problem without repeating the values:
+
+```json
+{"error": {"code": "validation_error", "message": "Invalid input.",
+  "fields": {"lead_time_days": ["Must be between 0 and 90."],
+             "weekday": ["Must be one of: mon, tue, wed, thu, fri, sat."],
+             "hour": ["This field is required."],
+             "no_show": ["Unknown field."]},
+  "request_id": "85e97f94-ce8f-4095-a240-3e63c548267c"}}
+```
+
+| Status | When |
+|---|---|
+| 200 | Valid input: prediction, probability, threshold, model version, disclaimer |
+| 400 | Missing field, wrong type, out of range, value not allowed, unknown field, broken rule, or a body that is not a JSON object |
+| 401 | Not signed in as a member (an admin session also gets 401, as on every member route) |
+| 403 | Missing or invalid `X-CSRFToken` header |
+| 429 | More than 30 requests a minute from the same member |
+| 503 | `model_unavailable`: the checksum-verified model could not be loaded |
+
+### Limitations and future work (Week 3)
+
+- **Synthetic data only.** The model rediscovers rules we wrote; it is not evidence about real appointments.
+- **One split and one seed**; the validation and test piles have 900 rows each, and small groups cannot be judged.
+- **The threshold** maximises F1 on validation, a neutral demo choice, not one based on real costs.
+- **The shipped model uses the training rows only**; production would refit on all the data and re-derive the
+  threshold.
+- **Pickle format**: protected by the checksum, but still a pickle. A safer format (skops or ONNX) is future work.
+- **Future work: training without `age_band`** (and other group inputs) to measure what removing them costs in
+  accuracy and how the group gaps change. It was left out of this week on purpose.
+
 ## What is new in Week 2
 
 Week 2 ("Role-Based Health Profiles and Database Engineering") extends the Week 1 app; nothing was rebuilt.
@@ -52,7 +260,8 @@ Week 2 (the assignment):
 | Database | PostgreSQL | Real `EXPLAIN` plans, partial unique indexes, DB-level constraints |
 | Frontend | Next.js (App Router) + TypeScript | Proxies `/api/*` to Django, so the browser sees one origin |
 | API docs | drf-spectacular (Swagger at `/api/docs/`) | Click-through, testable docs |
-| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 278 backend tests, 24 frontend tests |
+| ML (Week 3) | scikit-learn 1.9.1, pandas, numpy, joblib (exact pins in `requirements.txt`) | One Pipeline for preprocessing + model, reproducible with fixed seeds |
+| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 427 backend tests (278 Week 1–2 + 149 Week 3), 47 frontend tests (24 Week 1–2 + 23 Week 3) |
 
 ## Architecture
 
@@ -88,6 +297,7 @@ Browser ──► Next.js :3000 ──(rewrite /api/*)──► Django :8000 ─
 | `audit` | append-only `AuditEvent` model, `record_event()` (required) and `log_event()` (best-effort) |
 | `adminpanel` | admin session login, `IsAdminRole`, allow-list serializers, filters, audit endpoints |
 | `core` | request-id middleware, error handler, CSRF endpoint, `explain_queries` command |
+| `ml` (Week 3) | synthetic data generator, split and preprocessing, experiment and model report, checksum-verified model artifact, prediction endpoint (see "What is new in Week 3") |
 
 Views stay thin: authenticate, validate with a serializer, then in **one** `transaction.atomic()` call **one**
 function in `profiles/services.py` and write **one** required audit event. Every service function takes the
@@ -488,7 +698,7 @@ Real secrets live only in `backend/.env`, which is **git-ignored** and never com
 
 ```bash
 cd backend
-python -m pytest        # 278 passed
+python -m pytest        # 427 passed (278 Week 1–2 + 149 Week 3; the Week 3 test files are listed under "What is new in Week 3")
 ```
 
 | File | What it proves |
@@ -508,7 +718,7 @@ python -m pytest        # 278 passed
 
 ```bash
 cd frontend
-npm test                # 24 passed (Vitest + Testing Library, jsdom)
+npm test                # 47 passed (Vitest + Testing Library, jsdom); 23 of them are the Week 3 card tests
 ```
 
 | File | What it proves |
@@ -542,8 +752,10 @@ Full interactive docs: **http://127.0.0.1:8000/api/docs/** (Swagger, grouped by 
 | GET / POST | `/api/profiles/me/emergency-contacts/` | JWT (+ CSRF on POST) | List / add (max 3, else 400) |
 | GET / PATCH / DELETE | `/api/profiles/me/emergency-contacts/{id}/` | JWT (+ CSRF on writes) | One contact, looked up only inside my profile (else 404) |
 | GET | `/api/profiles/me/activity/` | JWT | My own audit events, newest first, paginated |
+| POST | `/api/ml/v1/no-show/predict/` | JWT + CSRF (throttled 30/min) | Week 3 educational demo: no-show chance for a fictional appointment; uses no profile data |
 
-A deactivated profile can be read (200) but every write and `DELETE` returns 403.
+A deactivated profile can be read (200) but every write and `DELETE` returns 403. (The Week 3 demo endpoint does not
+touch the profile, so it still works for a deactivated profile.)
 
 ### Admin endpoints (server session; a member JWT gets 403)
 
@@ -703,6 +915,17 @@ Week 1 example (still valid): `POST /api/auth/user/login/` with `{ "email": "mom
 | `explain.png` | Terminal: `python manage.py explain_queries` after `seed_profiles --bulk 1000` |
 | `pytest-week2.png` | Terminal: `python -m pytest` → **224 passed**. This is the original Week 2 run, before the review fixes; the final counts (278 backend, 24 frontend) and the tested commit are in [docs/evidence/week2-review.md](docs/evidence/week2-review.md) and the PR #3 conversation |
 
+### Week 3
+
+| | |
+|---|---|
+| ![Demo card with a result](docs/screenshots/week3/card-result.png) | ![Swagger request](docs/screenshots/week3/swagger-request.png) |
+| The demo card after "Check this example" on the prefilled fictional appointment: 52.8% chance, a bar, "likely to be missed", the model version and the disclaimer | Swagger: the *ml demo (educational)* endpoint, its disclaimer and the request example |
+| ![Swagger responses](docs/screenshots/week3/swagger-responses.png) | ![Quick check, light](docs/screenshots/week3/card-light.png) |
+| Swagger: the real 200 example and what 400, 401, 403, 429 and 503 mean | The card's quick check in light mode: 91 days is refused before anything is sent ("Enter a whole number from 0 to 90.") |
+| ![Quick check, dark](docs/screenshots/week3/card-dark.png) | |
+| The same quick check in dark mode | |
+
 ## Review response (PR #3)
 
 Mentor review of PR #3 at `9784e4d`. Each code point was fixed in its own commit on this branch, with tests that fail
@@ -739,12 +962,16 @@ into `main` first and then update PR #3 from `main` with that resolution, or clo
 How AI was used to plan, build, review and debug this project, including prompt iterations, blast radius
 control, a manual security review and a bug story: see [docs/ai-workflow.md](docs/ai-workflow.md).
 The rules the AI must follow in this repo are in [CLAUDE.md](CLAUDE.md).
+Week 3 has its own section there ("Week 3: Machine Learning Pipeline and Prediction API"): every prompt I sent, which
+ones were drafted with help from Claude in a separate chat, my decisions, and what the checks caught.
 
 ## Demo video
 
 Week 1: https://www.loom.com/share/7f3a96d221f1415b9c2abe2070b3f38e
 
 Week 2: https://www.loom.com/share/5d16ef5c30ba4496a1de8ce16270edba
+
+Week 3: https://www.loom.com/share/9d6433ae55664ab89026f9e7df4299b4
 
 ## Limitations
 
@@ -770,3 +997,5 @@ Week 2: https://www.loom.com/share/5d16ef5c30ba4496a1de8ce16270edba
 * The admin `created_after` / `created_before` filters use the server time zone (Asia/Karachi).
 * No password reset, email verification, or admin-created members yet. Wellness goals are personal goals only,
   never medical advice.
+* **Week 3 ML demo**: synthetic data only, one split and one seed, a pickle model file protected by a checksum, and
+  the model fitted on training rows only. See "Limitations and future work (Week 3)" above.

@@ -1,0 +1,207 @@
+{
+  "model_version": "noshow-1.0.0",
+  "model_file": "noshow-1.0.0.joblib",
+  "model_sha256": "d69f7723b34fe773da3eb09841304a050bb72410654c00487b1a4f242fec8218",
+  "notice": "Educational demo trained on synthetic data. Not medical advice, not a diagnosis, and not a prediction about any real person or appointment.",
+  "model": {
+    "type": "logistic_regression",
+    "settings": {
+      "C": 0.1
+    },
+    "fitted_on": "train",
+    "steps": [
+      "preprocess (median + was-blank column, scaling, 'missing' category, one-hot)",
+      "logistic_regression"
+    ]
+  },
+  "threshold": 0.22,
+  "threshold_rule": "best F1 on the validation pile, ties to the higher threshold",
+  "labels": {
+    "1": "likely_no_show",
+    "0": "likely_attend"
+  },
+  "input_schema": [
+    {
+      "name": "lead_time_days",
+      "may_be_blank": false,
+      "type": "integer",
+      "min": 0,
+      "max": 90
+    },
+    {
+      "name": "weekday",
+      "may_be_blank": false,
+      "type": "category",
+      "allowed": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat"
+      ]
+    },
+    {
+      "name": "hour",
+      "may_be_blank": false,
+      "type": "integer",
+      "min": 8,
+      "max": 17
+    },
+    {
+      "name": "visit_type",
+      "may_be_blank": false,
+      "type": "category",
+      "allowed": [
+        "new_visit",
+        "follow_up",
+        "routine_checkup",
+        "wellness_class"
+      ]
+    },
+    {
+      "name": "booking_channel",
+      "may_be_blank": false,
+      "type": "category",
+      "allowed": [
+        "online",
+        "phone",
+        "in_person"
+      ]
+    },
+    {
+      "name": "reminder_sent",
+      "may_be_blank": true,
+      "type": "category",
+      "allowed": [
+        "yes",
+        "no"
+      ]
+    },
+    {
+      "name": "prior_visits",
+      "may_be_blank": true,
+      "type": "integer",
+      "min": 0,
+      "max": 20
+    },
+    {
+      "name": "prior_no_shows",
+      "may_be_blank": true,
+      "type": "integer",
+      "min": 0,
+      "max": 20
+    },
+    {
+      "name": "distance_band",
+      "may_be_blank": true,
+      "type": "category",
+      "allowed": [
+        "under_5km",
+        "5_15km",
+        "15_30km",
+        "over_30km"
+      ]
+    },
+    {
+      "name": "age_band",
+      "may_be_blank": true,
+      "type": "category",
+      "allowed": [
+        "18-24",
+        "25-34",
+        "35-44",
+        "45-54",
+        "55-64",
+        "65+"
+      ]
+    }
+  ],
+  "input_rules": [
+    "prior_no_shows may not exceed prior_visits",
+    "prior_visits and prior_no_shows are either both given or both blank"
+  ],
+  "training_data": {
+    "file": "ml/data/appointments.csv",
+    "content_sha256": "76cd61d77485faf77c2a6c1b8ecc6e512eca7a204d769adcb462ae122b0afa3f",
+    "seed": 42,
+    "rows": 6000,
+    "noise": 1.0,
+    "split_seed": 42,
+    "pile_sizes": {
+      "train": {
+        "rows": 4200,
+        "no_shows": 874
+      },
+      "validation": {
+        "rows": 900,
+        "no_shows": 187
+      },
+      "test": {
+        "rows": 900,
+        "no_shows": 187
+      }
+    }
+  },
+  "metrics": {
+    "validation": {
+      "roc_auc": 0.6269,
+      "pr_auc": 0.308,
+      "brier": 0.1595,
+      "threshold": 0.22,
+      "precision": 0.3086,
+      "recall": 0.5348,
+      "f1": 0.3914,
+      "balanced_accuracy": 0.6103,
+      "accuracy": 0.6544,
+      "tp": 100,
+      "fp": 224,
+      "fn": 87,
+      "tn": 489
+    },
+    "test": {
+      "roc_auc": 0.6168,
+      "pr_auc": 0.3396,
+      "brier": 0.1585,
+      "threshold": 0.22,
+      "precision": 0.295,
+      "recall": 0.508,
+      "f1": 0.3733,
+      "balanced_accuracy": 0.5948,
+      "accuracy": 0.6456,
+      "tp": 95,
+      "fp": 227,
+      "fn": 92,
+      "tn": 486
+    },
+    "baseline_test": {
+      "roc_auc": 0.5,
+      "pr_auc": 0.2078,
+      "brier": 0.1646,
+      "threshold": 0.2,
+      "precision": 0.2078,
+      "recall": 1.0,
+      "f1": 0.3441,
+      "balanced_accuracy": 0.5,
+      "accuracy": 0.2078,
+      "tp": 187,
+      "fp": 713,
+      "fn": 0,
+      "tn": 0
+    },
+    "ceilings": {
+      "train": 0.665,
+      "validation": 0.6375,
+      "test": 0.6393
+    }
+  },
+  "environment": {
+    "python": "3.13",
+    "scikit-learn": "1.9.1",
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "joblib": "1.6.0",
+    "scipy": "1.18.1"
+  },
+  "created_by": "python -m ml.train"
+}
