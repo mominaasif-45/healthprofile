@@ -234,6 +234,7 @@ class WellnessView(MemberView):
 
 
 # ---------------------------------------------------------------- emergency contacts
+CONTACT_NOT_FOUND = "Emergency contact not found."
 CONTACT_EXAMPLE = OpenApiExample(
     "Contact", request_only=True,
     value={"name": "Bilal Ahmed", "relationship": "sibling", "phone": "+92 300 0000000", "is_primary": True},
@@ -270,8 +271,20 @@ class ContactDetailView(MemberView):
         # Looked up inside the caller's own profile only: someone else's id is simply "not found".
         contact = EmergencyContact.objects.filter(profile=profile, pk=pk).first()
         if contact is None:
-            raise NotFound("Emergency contact not found.")
+            raise NotFound(CONTACT_NOT_FOUND)
         return contact
+
+    @contextmanager
+    def gone_is_not_found(self):
+        """
+        The service re-reads the contact under the profile lock. If another request deleted it after
+        _contact() read it, that is the same 404 as an unknown id; the transaction rolls back and no
+        audit event is written.
+        """
+        try:
+            yield
+        except EmergencyContact.DoesNotExist:
+            raise NotFound(CONTACT_NOT_FOUND) from None
 
     @extend_schema(tags=TAG, summary="Get one of my emergency contacts", responses={200: EmergencyContactSerializer})
     def get(self, request, pk):
@@ -290,7 +303,7 @@ class ContactDetailView(MemberView):
         contact = self._contact(profile, pk)
         serializer = EmergencyContactSerializer(contact, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        with self.write_transaction(request, Action.CONTACT_UPDATED, profile):
+        with self.write_transaction(request, Action.CONTACT_UPDATED, profile), self.gone_is_not_found():
             contact, changed = services.update_contact(contact, serializer.validated_data)
             record_event(request, Action.CONTACT_UPDATED, target=profile, changed_fields=changed)
         return Response(EmergencyContactSerializer(contact).data)
@@ -301,7 +314,7 @@ class ContactDetailView(MemberView):
     def delete(self, request, pk):
         profile = self.get_profile(request, write_action=Action.CONTACT_DELETED)
         contact = self._contact(profile, pk)
-        with self.write_transaction(request, Action.CONTACT_DELETED, profile):
+        with self.write_transaction(request, Action.CONTACT_DELETED, profile), self.gone_is_not_found():
             services.delete_contact(contact)
             record_event(request, Action.CONTACT_DELETED, target=profile)
         return Response(status=status.HTTP_204_NO_CONTENT)

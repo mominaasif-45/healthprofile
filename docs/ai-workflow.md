@@ -234,7 +234,7 @@ and the real output is in [docs/evidence/week2-review.md](evidence/week2-review.
 - **The prompts** below were drafted with help from Claude in a separate chat. They are not written by me alone.
 - **I made the decisions** in them, chose between the options each plan offered, and approved every plan with "go"
   before any code was written. I decided when each commit was pushed.
-- **Claude Code** worked in the repository in one session: it read the code, wrote each plan, wrote the tests first,
+- **Claude Code** worked in the repository in one session (plus a follow-up session for prompts 11 to 13): it read the code, wrote each plan, wrote the tests first,
   implemented, ran the checks and made one commit per step, following `CLAUDE.md`. It never read `.env`, added no
   dependency, merged nothing and opened no PR.
 
@@ -334,6 +334,41 @@ go. Answers: 1 yes, 2 yes, 3 yes, 4 two commits (first the frontend phone check,
 ```
 </details>
 
+**Follow-up session (2026-11-04): contact deletion race.** My mentor's review of the Week 3 PR asked for this inherited
+Week 2 race to be fixed before the stack is merged. Prompts 11 to 13 were sent in a new Claude Code session on this branch.
+
+<details><summary>11. Follow-up plan request (drafted with help from Claude in a separate chat)</summary>
+
+```text
+New task on the Week 2 branch (PR #3). My mentor’s review on the Week 3 PR says: ‘Before merging the stack, fix the inherited contact deletion race: a contact can become primary after the view reads it but before the delete acquires the profile lock. Re-read the owned contact under the lock, handle concurrent removal as 404, and add a deterministic PostgreSQL test that checks primary promotion, completion and audit events.’
+
+Plan only. Do not change anything yet. Please:
+
+Find the delete-contact code (view and service) and explain the race in plain words, pointing at the exact lines.
+Propose the fix: re-read the contact by id and owner after taking the profile lock, and return 404 if it is gone.
+Propose the deterministic test, using threading events like our existing concurrency tests: how it forces the exact order (pause the delete after the view’s read and before the lock, make the contact primary in another thread, then release), and what it asserts after the race (exactly one primary, completion state, audit events with field names only).
+Say how we will show the new test failing first against the current code, then passing.
+List which files change, the blast radius, and whether Week 1 or Week 3 code is touched.
+This message was drafted with help from Claude in a separate chat; please log it.
+
+Don’t commit and don’t push.
+```
+</details>
+
+<details><summary>12. Follow-up decision (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Go. Answers: include the update_contact fix with its own test. Tests first: show me E and F failing on the current code with the -rs output, then make the fix and show them passing. Then run the full backend suite, tests/test_concurrency.py 20 times in a row, and makemigrations --check, and show me the real outputs. Add the evidence to docs/evidence/week2-review.md and the README review-response table, and update the test docstring. Log this message as prompt 12 and your plan request as prompt 11, both marked ‘drafted with help from Claude in a separate chat’. For Week 3 we will merge (not rebase) later; do not touch the Week 3 branch. Commit only after I approve your report. Do not push.
+```
+</details>
+
+<details><summary>13. Follow-up approval (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Approved. Log this message as prompt 13 in the same commit, marked ‘drafted with help from Claude in a separate chat’, then commit with fix(contacts): re-read the contact under the profile lock; concurrent removal is 404. Then push feature/week2-profiles-audit (no force) so PR #3 updates, and show me git status and the full commit hash. Also draft a short comment for me to post on PR #3 that names the commit hash, says what the race was in two sentences, says I also fixed the same race in update_contact (it returned a 500), and gives the test counts (278) and the 20-of-20 result. Do not touch the Week 3 branch.
+```
+</details>
+
 ### My decisions and corrections
 
 | Phase | Options I was given | What I decided or added |
@@ -343,6 +378,7 @@ go. Answers: 1 yes, 2 yes, 3 yes, 4 two commits (first the frontend phone check,
 | 3 Lock and re-check | Locking policy, response, audit outcome and test approach as proposed | Approved; added: 20 consecutive runs of the concurrency tests, and a check that leftover thread connections cannot leave locks or connections behind, even when a test fails or times out |
 | 4 Primary contact | (a) reject unsetting the current primary · (b) hand the primary to the oldest other contact automatically | Chose **(a)**; approved the `ContactsCard.tsx` change (outside the earlier backend scope); asked for the README to say plainly that "at least one" is in the service and "at most one" in the database |
 | 5 Evidence and handoff | One or two commits; a throwaway database; a temporary merge branch; an evidence file | Added the frontend phone check to this phase; chose two commits; approved the throwaway database, temporary branch and evidence file; corrected this document so the prompts are not described as written by me alone |
+| Follow-up: contact deletion race | Also fix the same gap in `update_contact` (a PATCH losing to a delete gave 500), which the mentor had not asked for, or leave it | Included it with its own test (G); asked for E and F to be shown failing first with `-rs`, the full suite, 20 consecutive concurrency runs and `makemigrations --check`; Week 3 will take the fix by a merge (not a rebase) later, and its branch is not touched |
 
 ### What the checks caught
 
@@ -366,6 +402,9 @@ surfaced these during the session:
   and nothing was written; the script was rewritten.
 - **A gap flagged for me to decide.** After Phase 4, Claude Code pointed out that the frontend phone check still used the
   old pattern (out of scope at the time). I added it to Phase 5.
+- **Follow-up, a second gap found while planning.** Reading `update_contact` for the deletion-race plan showed that a
+  PATCH losing the race to a delete crashed with a 500. Claude Code flagged it as outside the mentor's request; I chose
+  to include it. Test G proved the 500 on the old code before the fix.
 
 ### Limits (stated honestly)
 

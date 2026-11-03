@@ -4,7 +4,8 @@ Real output from the review-response work on `feature/week2-profiles-audit` (PR 
 Synthetic data only. Database output shows constraint names and PostgreSQL error codes, never phone values.
 
 Commits: `6a5633f` audit durability · `15f7b1b` phone normalisation · `b8dd91a` lock and re-check ·
-`3c58e99` primary contact · `40cb5ab` frontend phone check · the docs commit that adds this file.
+`3c58e99` primary contact · `40cb5ab` frontend phone check · the docs commit that adds this file · the follow-up
+commit for the contact deletion race (§6).
 
 ## 1. Database: migrations from a clean database, catalog check, raw SQL attempts
 
@@ -137,3 +138,48 @@ npm run lint exit: 0 · tsc exit: 0 · npm run build exit: 0
 
 The final migrations, backend tests, frontend tests, lint, type-check and build were run on the commit that adds this
 file. That commit cannot contain its own hash, so the tested commit is named in the PR #3 conversation.
+
+## 6. Follow-up: contact deletion race (from the Week 3 PR review)
+
+Captured on 2026-11-04 on `feature/week2-profiles-audit`. The mentor's review of the Week 3 PR asked to fix this
+inherited Week 2 race before merging the stack: `ContactDetailView.delete` read the contact, then `delete_contact` took
+the profile lock and trusted that earlier copy. A contact made primary in between was deleted without promoting another
+(zero primaries), and a contact deleted in between gave a second 204 and a second `emergency_contact.deleted` event.
+The same gap in `update_contact` (it re-read under the lock but nothing caught "gone") gave a 500.
+
+New tests in `tests/test_concurrency.py`. Each pauses one request just before `services._lock` (after the view's read),
+lets a second request commit, then releases the first:
+
+| Test | Race | Expected after the race |
+|---|---|---|
+| E | delete B paused; PATCH makes B primary and commits | 204; only A left and it is primary; completion 50 % / in_progress and equal to a fresh recount; events `updated ["is_primary"]`, `deleted []`; no name or phone value in any audit row |
+| F | delete A paused; a second delete of A commits | paused delete gets 404 `not_found` "Emergency contact not found."; only B left, primary; completion as above; exactly one `deleted []` event |
+| G | PATCH B paused; a delete of B commits | PATCH gets 404 (not 500); only A left, primary; completion as above; exactly one `deleted []` event |
+
+Old code (`96e29a2`, tests added, nothing else changed), `python -m pytest tests/test_concurrency.py -k "test_e_ or test_f_ or test_g_" -rs`:
+
+```text
+test_concurrency.py:326: assert [] == [<EmergencyContact: Sana Ahmed (sibling)>]    <- E: zero primaries
+test_concurrency.py:343: assert 204 == 404                                          <- F: second delete "succeeded"
+test_concurrency.py:153: AssertionError: patch raised DoesNotExist('EmergencyContact matching query does not exist.')   <- G: 500
+3 failed, 6 deselected in 5.36s
+```
+
+`-rs` printed no skipped tests: they ran on PostgreSQL. With the fix, same command:
+
+```text
+3 passed, 6 deselected in 5.80s
+```
+
+Full backend suite and migration check with the fix:
+
+```text
+python -m pytest -rs: 278 passed in 33.17s
+python manage.py makemigrations --check: No changes detected (exit 0)
+```
+
+`tests/test_concurrency.py` 20 times in a row, each in a fresh pytest process with a fresh test database:
+
+```text
+run  1..20: 9 passed (every run)     clean runs: 20 / 20     (12-16 s per run)
+```
