@@ -1,9 +1,12 @@
 """
-PostgreSQL concurrency: a member write racing an admin deactivation.
+PostgreSQL concurrency: a member write racing an admin deactivation (A-D), and a contact changing
+between the view's read and the profile lock (E-G).
 
 Policy under test: every change to a profile (member write or admin deactivate / reactivate) first
 locks the profile row with SELECT ... FOR UPDATE and decides using that locked, fresh row. So no
 member write can commit after a deactivation has committed, and admins decide "changed" correctly.
+The same goes for the contact itself: it is re-read under the lock, so a contact made primary in the
+meantime still hands the primary on, and one deleted in the meantime gives 404 (no event written).
 
 How the tests stay reliable (no sleep-and-hope timing):
   - The member and the admin run in two threads, each with its own real database connection.
@@ -292,3 +295,125 @@ def test_d_two_admin_deactivations_record_exactly_one_status_change(setup, race,
         ("admin.profile_deactivated", "success", ["status"]),
         ("admin.profile_deactivated", "success", []),  # the second one changed nothing
     ]
+
+
+# ------------------------------------------------------------------ E-G: a contact changes between the view's read and the lock
+CONTACTS = ROOT + "emergency-contacts/"
+CONTACT_FIELDS = {f.name for f in EmergencyContact._meta.get_fields()}
+NOT_FOUND = "Emergency contact not found."
+
+
+@pytest.fixture
+def two_contacts(client, user):
+    """Contact A (oldest, primary) and B (newer, not primary); completion 50% (demographics + contacts)."""
+    profile = make_profile(user, sections=("demographics", "contact"))
+    a = EmergencyContact.objects.get(profile=profile)
+    b = EmergencyContact.objects.create(profile=profile, name="Bilal Ahmed", relationship="friend",
+                                        phone="+923111112223", is_primary=False)
+    services.recalculate_completion(profile)
+    return profile, a, b
+
+
+def member_client(client_class):
+    return logged_in_member(client_class())
+
+
+def pause_before_lock(pause, monkeypatch, thread_name):
+    """Stop the named thread just before services._lock: the view has already read the contact."""
+    before_lock = pause(thread_name)
+    monkeypatch.setattr(services, "_lock", before_lock.wrap(services._lock))
+    return before_lock
+
+
+def assert_one_primary_and_true_completion(profile, primary):
+    assert list(EmergencyContact.objects.filter(profile=profile, is_primary=True)) == [primary]
+    stored = HealthProfile.objects.get(pk=profile.pk)
+    done = sum(1 for _, ok in services.completion_checks(stored) if ok)
+    assert (stored.completion_percent, stored.completion_status) == (50, "in_progress")
+    assert stored.completion_percent == done * services.SECTION_WEIGHT  # matches the real rows
+
+
+def assert_audit_has_names_only(profile):
+    events = AuditEvent.objects.filter(target_type="health_profile", target_id=profile.id)
+    for changed in events.values_list("changed_fields", flat=True):
+        assert set(changed) <= CONTACT_FIELDS
+    stored = str(list(events.values()))
+    for value in ("Sana Ahmed", "Bilal Ahmed", "3001234567", "3111112223"):
+        assert value not in stored
+
+
+def assert_not_found(response):
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+    assert response.json()["error"]["message"] == NOT_FOUND
+
+
+def test_e_contact_made_primary_after_the_delete_read_it(two_contacts, race, monkeypatch, client):
+    """The delete reads B (not primary) and stops before the lock. A PATCH makes B primary and commits.
+    The delete continues: it must re-read B under the lock, see it is now primary, and promote A."""
+    profile, a, b = two_contacts
+    start, pause = race
+    before_lock = pause_before_lock(pause, monkeypatch, "delete")
+
+    d = start("delete", lambda: member_client(type(client)).delete(f"{CONTACTS}{b.id}/"))
+    before_lock.wait_until_reached()
+    p = start("patch", lambda: member_client(type(client)).patch(f"{CONTACTS}{b.id}/", {"is_primary": True},
+                                                                  format="json"))
+    [patch_response] = finish(p)  # committed while the delete holds no lock
+    assert patch_response.status_code == 200
+    before_lock.go()
+    [delete_response] = finish(d)
+
+    assert delete_response.status_code == 204
+    assert list(EmergencyContact.objects.filter(profile=profile)) == [a]
+    assert_one_primary_and_true_completion(profile, a)
+    assert profile_events(profile.id) == [
+        ("emergency_contact.updated", "success", ["is_primary"]),
+        ("emergency_contact.deleted", "success", []),
+    ]
+    assert_audit_has_names_only(profile)
+
+
+def test_f_contact_deleted_by_another_request_after_the_delete_read_it(two_contacts, race, monkeypatch, client):
+    """Delete 1 reads A and stops before the lock. Delete 2 removes A (promoting B) and commits.
+    Delete 1 continues: A is gone under the lock, so it gets 404, changes nothing and writes no event."""
+    profile, a, b = two_contacts
+    start, pause = race
+    before_lock = pause_before_lock(pause, monkeypatch, "delete1")
+
+    d1 = start("delete1", lambda: member_client(type(client)).delete(f"{CONTACTS}{a.id}/"))
+    before_lock.wait_until_reached()
+    d2 = start("delete2", lambda: member_client(type(client)).delete(f"{CONTACTS}{a.id}/"))
+    [second] = finish(d2)
+    assert second.status_code == 204
+    before_lock.go()
+    [first] = finish(d1)
+
+    assert_not_found(first)
+    assert list(EmergencyContact.objects.filter(profile=profile)) == [b]
+    assert_one_primary_and_true_completion(profile, b)
+    assert profile_events(profile.id) == [("emergency_contact.deleted", "success", [])]  # exactly one
+    assert_audit_has_names_only(profile)
+
+
+def test_g_contact_deleted_by_another_request_after_the_patch_read_it(two_contacts, race, monkeypatch, client):
+    """The PATCH reads B and stops before the lock. A delete removes B and commits. The PATCH continues:
+    B is gone under the lock, so it gets 404 (not a 500), changes nothing and writes no event."""
+    profile, a, b = two_contacts
+    start, pause = race
+    before_lock = pause_before_lock(pause, monkeypatch, "patch")
+
+    p = start("patch", lambda: member_client(type(client)).patch(f"{CONTACTS}{b.id}/", {"name": "Bilal Khan"},
+                                                                  format="json"))
+    before_lock.wait_until_reached()
+    d = start("delete", lambda: member_client(type(client)).delete(f"{CONTACTS}{b.id}/"))
+    [deleted] = finish(d)
+    assert deleted.status_code == 204
+    before_lock.go()
+    [patched] = finish(p)
+
+    assert_not_found(patched)
+    assert list(EmergencyContact.objects.filter(profile=profile)) == [a]
+    assert_one_primary_and_true_completion(profile, a)
+    assert profile_events(profile.id) == [("emergency_contact.deleted", "success", [])]
+    assert_audit_has_names_only(profile)

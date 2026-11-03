@@ -211,7 +211,7 @@ def update_contact(contact, data):
     data = _with_canonical_phone(data)
     profile = _lock(contact.profile)
     contacts = EmergencyContact.objects.filter(profile=profile)
-    contact = contacts.get(pk=contact.pk)
+    contact = contacts.get(pk=contact.pk)  # fresh copy; DoesNotExist (view: 404) if deleted meanwhile
     if "phone" in data and contacts.exclude(pk=contact.pk).filter(phone=data["phone"]).exists():
         raise ValidationError({"phone": ["This phone number is already saved on your profile."]})
 
@@ -234,6 +234,9 @@ def update_contact(contact, data):
 @transaction.atomic
 def delete_contact(contact):
     profile = _lock(contact.profile)
+    # Re-read under the lock: the caller's copy may be stale (made primary, or deleted, meanwhile).
+    # Raises EmergencyContact.DoesNotExist if another request removed it; the view answers 404.
+    contact = EmergencyContact.objects.filter(profile=profile).get(pk=contact.pk)
     was_primary = contact.is_primary
     EmergencyContact.objects.filter(pk=contact.pk).delete()
     if was_primary:  # keep one primary: promote the oldest remaining contact

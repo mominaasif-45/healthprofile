@@ -42,8 +42,8 @@ limits), the [analysis](docs/ml/eda.md) (training data only) and the [model repo
 - [x] **Versioned inference endpoint** `POST /api/ml/v1/no-show/predict/` that validates the input schema, rejects
   malformed, out-of-range and unknown fields, and returns the prediction, probability and model version
 - [x] **Dashboard card** on `/profile`, labelled as an educational demo, never medical advice
-- [x] **Week 1 and Week 2 still work**: all 275 earlier backend tests and 24 frontend tests still pass
-- [x] **Tests**: 149 new backend tests (424 in total) and 23 new frontend tests (47 in total)
+- [x] **Week 1 and Week 2 still work**: all 278 earlier backend tests and 24 frontend tests still pass
+- [x] **Tests**: 149 new backend tests (427 in total) and 23 new frontend tests (47 in total)
 - [x] **Trade-offs documented** (below)
 
 ### How it fits together
@@ -148,7 +148,7 @@ python -m ml.experiment                                         # rebuild the mo
 python -m ml.train --check                                      # rebuild the model in memory and compare; writes nothing
 python -m ml.train                                              # write the model files (then review EXPECTED_SHA256)
 
-python -m pytest                    # 424 passed (275 Week 1–2 + 149 Week 3), about 2 minutes
+python -m pytest                    # 427 passed (278 Week 1–2 + 149 Week 3), about 2 minutes
 ML_SKIP_SLOW=1 python -m pytest     # skips the 7 slow retraining tests locally (they run by default)
 ```
 
@@ -246,7 +246,7 @@ Week 2 (the assignment):
 - [x] **Sensitive fields hidden** from admin responses (date of birth, allergies, lifestyle notes; phones masked)
 - [x] **Foreign keys, unique constraints and composite indexes** justified by real queries, with `EXPLAIN (ANALYZE, BUFFERS)` evidence
 - [x] **Admin reactivate** and per-profile **history** endpoint
-- [x] **Role-boundary tests**: 275 backend tests, including every route checked for member / admin / signed-out access
+- [x] **Role-boundary tests**: 278 backend tests, including every route checked for member / admin / signed-out access
 - [x] **Migrations** with a data migration that moves existing Week 1 data into the new tables
 - [x] Updated **Swagger** (tags, descriptions, examples), README, `CLAUDE.md` project rules
 
@@ -261,7 +261,7 @@ Week 2 (the assignment):
 | Frontend | Next.js (App Router) + TypeScript | Proxies `/api/*` to Django, so the browser sees one origin |
 | API docs | drf-spectacular (Swagger at `/api/docs/`) | Click-through, testable docs |
 | ML (Week 3) | scikit-learn 1.9.1, pandas, numpy, joblib (exact pins in `requirements.txt`) | One Pipeline for preprocessing + model, reproducible with fixed seeds |
-| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 424 backend tests, 47 frontend tests |
+| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 427 backend tests (278 Week 1–2 + 149 Week 3), 47 frontend tests (24 Week 1–2 + 23 Week 3) |
 
 ## Architecture
 
@@ -698,7 +698,7 @@ Real secrets live only in `backend/.env`, which is **git-ignored** and never com
 
 ```bash
 cd backend
-python -m pytest        # 424 passed (the Week 3 test files are listed under "What is new in Week 3")
+python -m pytest        # 427 passed (278 Week 1–2 + 149 Week 3; the Week 3 test files are listed under "What is new in Week 3")
 ```
 
 | File | What it proves |
@@ -708,7 +708,7 @@ python -m pytest        # 424 passed (the Week 3 test files are listed under "Wh
 | `test_profile_sections.py` | demographics and wellness: PUT replace vs PATCH, validation (future / ancient date of birth, bad choices, ranges), goals replaced atomically |
 | `test_emergency_contacts.py` | CRUD, max 3, primary rule, duplicate phone, **member A cannot read, edit or delete member B's contact (404)** |
 | `test_primary_contact.py` | unsetting the current primary (also the only contact) → 400 with a clear message and nothing saved; editing the primary while keeping it primary works; and the **invariant test**: create, create-as-primary, "Make primary", refused unset, delete primary, delete down to zero, start again, checking **after every step** that a profile with contacts has exactly one primary (and an empty one has none) |
-| `test_concurrency.py` | **PostgreSQL, two real connections in threads**, paused at exact lines with events (no sleep-based timing) and lock waits confirmed through `pg_stat_activity`: deactivation before the member takes the lock (PATCH, contact POST, profile DELETE) → 403 + committed `denied` event; member waiting on the admin's lock → 403; admin waiting on the member's lock → member's 200 counts; two admins → only one status change recorded. Cleanup always releases, joins and closes, and checks no connection or lock is left |
+| `test_concurrency.py` | **PostgreSQL, two real connections in threads**, paused at exact lines with events (no sleep-based timing) and lock waits confirmed through `pg_stat_activity`: deactivation before the member takes the lock (PATCH, contact POST, profile DELETE) → 403 + committed `denied` event; member waiting on the admin's lock → 403; admin waiting on the member's lock → member's 200 counts; two admins → only one status change recorded; a contact made primary, or deleted, between the view's read and the lock → the delete re-reads it under the lock and still hands the primary on, and a delete or PATCH of a contact deleted meanwhile → 404, no event. Cleanup always releases, joins and closes, and checks no connection or lock is left |
 | `test_phone_normalisation.py` | punctuation-heavy input (`1------`), the 7 / 15 digit boundaries, canonical storage, equivalent formats as duplicates on POST and PATCH, the fourth-contact limit in any format, the database CHECK, and migration 0007 (rewrites rows; stops on unsafe rows naming ids only) |
 | `test_audit.py` | exactly one event per write, no secrets or values in any audit field, append-only, request id on every response and in the audit row, member activity |
 | `test_audit_durability.py` | failure injection: when the required audit insert fails, every member write, profile deletion and admin deactivate / reactivate returns 503 `audit_unavailable` and rolls back completely (data, stored completion, no audit row) |
@@ -913,7 +913,7 @@ Week 1 example (still valid): `POST /api/auth/user/login/` with `{ "email": "mom
 | `admin-audit.png` | `/admin/audit` with a filter applied |
 | `swagger-week2.png` | `/api/docs/` showing the *member profile*, *admin profiles* and *admin audit* groups |
 | `explain.png` | Terminal: `python manage.py explain_queries` after `seed_profiles --bulk 1000` |
-| `pytest-week2.png` | Terminal: `python -m pytest` → **224 passed**. This is the original Week 2 run, before the review fixes; the final counts (275 backend, 24 frontend) and the tested commit are in [docs/evidence/week2-review.md](docs/evidence/week2-review.md) and the PR #3 conversation |
+| `pytest-week2.png` | Terminal: `python -m pytest` → **224 passed**. This is the original Week 2 run, before the review fixes; the final counts (278 backend, 24 frontend) and the tested commit are in [docs/evidence/week2-review.md](docs/evidence/week2-review.md) and the PR #3 conversation |
 
 ### Week 3
 
@@ -938,6 +938,7 @@ on the previous commit and pass on the fix. Real output: [docs/evidence/week2-re
 | **3. Permission re-check after the lock** | Every profile change, member or admin, locks the profile row first and decides from that fresh row; a deactivation that committed while the request waited gives 403, and the `denied` event is written after the rollback so it is kept. The contact-limit lock is unchanged | `b8dd91a` | `test_concurrency.py`: PostgreSQL, two real connections, paused with events (no sleeps), 20 / 20 consecutive runs |
 | **4. Primary contact** | A profile with contacts always has exactly one primary: unsetting the current primary returns 400; the edit form locks that checkbox with a hint. *At most one* by the database, *at least one* by the service | `3c58e99` | `test_primary_contact.py` invariant test checks the rule after every step; `contacts-card.test.tsx` |
 | **5. Evidence and handoff** | Catalog check and a raw-SQL second primary rejected after the migrations (also on a database migrated from zero); overlap with Week 1 PR #2 checked by a throwaway merge (not merged); limits stated; final validation. Also: the frontend phone check now uses the server's rule (`40cb5ab`) | `40cb5ab` + this docs commit | `docs/evidence/week2-review.md`, [docs/ai-workflow.md](docs/ai-workflow.md) "Week 2 review response" |
+| **Follow-up (from the Week 3 PR review): contact deletion race** | `delete_contact` re-reads the contact by id and owner **under the profile lock**, so a contact made primary after the view read it still hands the primary on; a contact deleted meanwhile gives 404 and writes no event. The same 404 now replaces a 500 when a PATCH loses the race to a delete (`update_contact` already re-read under the lock, but nothing caught "gone") | follow-up commit (hash in the PR #3 conversation) | `test_concurrency.py` E, F, G: fail on `96e29a2`, pass on the fix; checks one primary, completion and field-names-only audit events; 20 / 20 consecutive runs (evidence file §6) |
 
 **Week 1 PR #2 overlap.** PR #2 is not merged. A throwaway merge into this branch gave 10 conflicts; in every one this
 branch already has its own later version of the same Week 1 fix, so each resolves to this branch's file, and the merged
