@@ -12,18 +12,20 @@ export class ApiError extends Error {
   status: number;
   code: string;
   fields: Fields;
-  constructor(status: number, code: string, message: string, fields: Fields = {}) {
+  requestId?: string;
+  constructor(status: number, code: string, message: string, fields: Fields = {}, requestId?: string) {
     super(message);
     this.status = status;
     this.code = code;
     this.fields = fields;
+    this.requestId = requestId;
   }
 }
 
 export type AuthKind = "user" | "admin" | "none";
 
 type Options = {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   auth?: AuthKind;
 };
@@ -63,7 +65,7 @@ export function minutesUntilRenewal(): number | null {
 }
 
 async function parseError(res: Response): Promise<ApiError> {
-  type ErrorBody = { error?: { code?: string; message?: string; fields?: Fields } };
+  type ErrorBody = { error?: { code?: string; message?: string; fields?: Fields; request_id?: string } };
   let body: ErrorBody | null = null;
   try {
     body = (await res.json()) as ErrorBody;
@@ -73,7 +75,8 @@ async function parseError(res: Response): Promise<ApiError> {
     res.status,
     err?.code ?? "error",
     err?.message ?? `Request failed (${res.status})`,
-    err?.fields ?? {}
+    err?.fields ?? {},
+    err?.request_id ?? res.headers.get("X-Request-ID") ?? undefined
   );
 }
 
@@ -145,39 +148,96 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
 // ------------------------------------------------------------------ types
 export type User = { id: number; name: string; email: string; role: "user" | "admin"; date_joined: string };
 
-export type Profile = {
-  id: number;
+// ---- member profile (all sections, full data: members see their own everything)
+export type Demographics = {
   full_name: string;
+  preferred_name: string;
   date_of_birth: string | null;
   age_range: string | null;
+  gender: string;
+  city: string;
+  created_at?: string;
+};
+
+export type EmergencyContact = {
+  id: number;
+  name: string;
+  relationship: string;
+  phone: string;
+  is_primary: boolean;
+};
+
+export type Wellness = {
   contact_preference: "email" | "phone" | "sms";
-  wellness_goals: string[];
+  activity_level: string;
+  diet_preference: string;
+  sleep_goal_hours: number | null;
   allergies: string;
-  emergency_contact_name: string;
-  emergency_contact_phone: string;
   lifestyle_notes: string;
+  goals: string[];
+  created_at?: string;
+};
+
+export type Completion = {
+  status: "not_started" | "in_progress" | "complete";
+  percent: number;
+  missing: string[];
+};
+
+export type Profile = {
+  id: number;
   status: "active" | "deactivated";
-  completeness: { percent: number; missing: string[] };
+  completion: Completion;
+  demographics: Demographics | null;
+  emergency_contacts: EmergencyContact[];
+  wellness: Wellness | null;
   created_at: string;
   updated_at: string;
 };
+
+export type AuditEvent = {
+  id: number;
+  created_at: string;
+  action: string;
+  target_type: string;
+  target_id: number | null;
+  changed_fields: string[];
+  outcome: "success" | "denied" | "failed";
+  request_id: string | null;
+};
+
+// ---- admin views (an allow-list: no date of birth, allergies, notes or full phone numbers)
+export type AdminAuditEvent = AuditEvent & { actor: number | null; actor_role: string };
 
 export type AdminRow = {
   id: number;
-  full_name: string;
+  display_name: string;
   email: string;
-  age_range: string | null;
-  contact_preference: "email" | "phone" | "sms";
-  wellness_goals: string[];
-  allergies: string;
-  emergency_contact_name: string;
   status: "active" | "deactivated";
+  completion_status: Completion["status"];
+  completion_percent: number;
   created_at: string;
-  updated_at: string;
 };
 
-export type AdminProfile = Profile & { email: string; account_name: string; member_since: string };
-
+export type AdminProfile = AdminRow & {
+  updated_at: string;
+  demographics: {
+    full_name: string;
+    preferred_name: string;
+    age_range: string | null;
+    gender: string;
+    city: string;
+  } | null;
+  emergency_contacts: { id: number; name: string; relationship: string; phone_masked: string; is_primary: boolean }[];
+  wellness: {
+    contact_preference: string;
+    activity_level: string;
+    diet_preference: string;
+    sleep_goal_hours: number | null;
+    goals: string[];
+    has_allergies: boolean;
+  } | null;
+};
 export type Page<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 // ------------------------------------------------------------------ user auth helpers
@@ -220,7 +280,9 @@ export function fieldError(err: unknown, field: string): string | undefined {
 export function errorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     const first = Object.values(err.fields)[0]?.[0];
-    return err.status === 400 && first ? first : err.message;
+    if (err.status === 400 && first) return first;
+    // Quote the request id so a problem can be traced to the matching audit / server log line.
+    return err.requestId ? `${err.message} (ref ${err.requestId.slice(0, 8)})` : err.message;
   }
   return "Something went wrong. Please try again.";
 }
