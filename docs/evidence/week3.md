@@ -19,6 +19,9 @@ A file cannot contain the hash of the commit that adds it, so:
   whole list was run again on **the merge commit**. Those results are the current ones: see
   [After the Week 2 race fix](#after-the-week-2-race-fix) at the end of this file. The outputs below are kept as the
   record of the earlier run.
+* **Update (8 November 2026):** the PostgreSQL race tests now run in CI, and were run on the Week 3 head `4711574`
+  with a clean tree: see
+  [PostgreSQL race tests in CI and on the Week 3 head](#postgresql-race-tests-in-ci-and-on-the-week-3-head-mentor-review-of-pr-3).
 
 ## Final validation list
 
@@ -234,3 +237,72 @@ python -m pytest -rs: 429 passed in 205.86s (0:03:25)    (278 Week 1–2 + 151 W
 ```
 
 The frontend count is unchanged: 47 tests (23 for the card).
+
+## PostgreSQL race tests in CI and on the Week 3 head (mentor review of PR #3)
+
+The PR #3 review: `tests/test_concurrency.py` skips on any database that is not PostgreSQL, so a green SQLite run
+cannot validate the race fix. The tests must run in a reproducible CI job that shows the database backend and the skip
+summary, and fails if the intended race cases do not run.
+
+**The CI job** ([`.github/workflows/ci.yml`](../../.github/workflows/ci.yml), added in `4711574`):
+
+* Runs on every push, on Ubuntu 24.04 with Python 3.13 and a `postgres:17` service.
+* Uses throwaway CI-only settings written in the workflow, never `backend/.env`.
+* Prints the tested commit, the database vendor and the server version. It stops if the vendor is not PostgreSQL.
+* Runs `python -m pytest tests/test_concurrency.py -rs -vv`.
+* Then [`.github/scripts/check_race_run.py`](../../.github/scripts/check_race_run.py) reads pytest's JUnit report and
+  fails the job unless **exactly 9** race tests ran, with none skipped, failed or errored. pytest on its own would
+  report a run where everything was skipped as a success.
+
+**The guard was proved to fail** before it was committed (8 November 2026, the same script):
+
+| Run | pytest | Guard |
+|---|---|---|
+| SQLite (`DATABASE_URL=sqlite://:memory:`) | `9 skipped`, exit 0 | `FAIL: 9 race test(s) were skipped` and `FAIL: expected 9 race tests to run, but 0 ran`, **exit 1** |
+| PostgreSQL, test G left out (`-k "not test_g"`) | `8 passed, 1 deselected`, exit 0 | `FAIL: expected 9 race tests to run, but 8 ran`, **exit 1** |
+| PostgreSQL, all tests | `9 passed`, exit 0 | `OK: every race test ran on PostgreSQL and passed`, **exit 0** |
+
+**First CI run, on `4711574`: green.**
+[Actions run 42509900392, job "Race tests (PostgreSQL 17)"](https://github.com/mominaasif-45/healthprofile/actions/runs/42509900392/job/128820476023).
+
+**Local run on the Week 3 head.** Tested commit `471157467bfba53f8cb471fefcf1673ddcb53cec` (the pushed head at the
+time), clean working tree, 8 November 2026. Run from `backend/` with the venv active:
+
+```text
+> git status --short
+(nothing: clean working tree, before and after the run)
+
+> git log -1 --format="Tested commit: %H %s"
+Tested commit: 471157467bfba53f8cb471fefcf1673ddcb53cec ci: run PostgreSQL race tests in GitHub Actions and fail if any is skipped
+
+> python -c "...print the database vendor and server version..."
+vendor: postgresql
+server: PostgreSQL 17.11 on x86_64-windows, compiled by msvc-19.44.35229, 64-bit
+
+> python -m pytest tests/test_concurrency.py -rs -vv
+platform win32 -- Python 3.13.16, pytest-9.1.1, pluggy-1.7.0
+django: version: 6.1.2, settings: config.settings (from ini)
+collecting ... collected 9 items
+
+tests/test_concurrency.py::test_a_member_passed_the_early_check_then_admin_deactivated[patch demographics] PASSED [ 11%]
+tests/test_concurrency.py::test_a_member_passed_the_early_check_then_admin_deactivated[create contact] PASSED [ 22%]
+tests/test_concurrency.py::test_a_member_passed_the_early_check_then_admin_deactivated[delete profile] PASSED [ 33%]
+tests/test_concurrency.py::test_b_member_waits_for_the_admins_lock_then_sees_the_deactivation PASSED [ 44%]
+tests/test_concurrency.py::test_c_admin_waits_for_the_members_lock_and_the_member_write_counts PASSED [ 55%]
+tests/test_concurrency.py::test_d_two_admin_deactivations_record_exactly_one_status_change PASSED [ 66%]
+tests/test_concurrency.py::test_e_contact_made_primary_after_the_delete_read_it PASSED [ 77%]
+tests/test_concurrency.py::test_f_contact_deleted_by_another_request_after_the_delete_read_it PASSED [ 88%]
+tests/test_concurrency.py::test_g_contact_deleted_by_another_request_after_the_patch_read_it PASSED [100%]
+
+============================= 9 passed in 27.25s ==============================
+
+> python ..\.github\scripts\check_race_run.py race-results.xml 9     (pytest also given --junitxml)
+race tests: expected 9, ran 9, skipped 0, failed 0, errors 0
+OK: every race test ran on PostgreSQL and passed
+```
+
+**Skip summary:** `-rs` asks pytest to list every skipped test with its reason. It printed none, and the guard counted
+0 skipped: all 9 race cases ran on PostgreSQL.
+
+The commit that adds this section changes only documentation. CI runs again on it after the push, so the final head
+is also checked on PostgreSQL.

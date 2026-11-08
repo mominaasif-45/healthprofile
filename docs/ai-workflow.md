@@ -757,6 +757,27 @@ Approved. Two changes before you commit: (1) change the README’s backend test 
 ```
 </details>
 
+<details><summary>32. Push request (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Push feature/week3-ml-pipeline now (no force) and show me the push output and git status
+```
+</details>
+
+<details><summary>33. C4: race-test evidence on the Week 3 head (drafted with help from Claude in a separate chat)</summary>
+
+```text
+The first CI run on 4711574 is green: https://github.com/mominaasif-45/healthprofile/actions/runs/42509900392/job/128820476023 .Please do the C4 step: on that exact commit with a clean tree, run the section 5 evidence commands (git status, the tested commit line, the database vendor and server version, and python -m pytest tests/test_concurrency.py -rs -vv) and show me the real output. Then draft C4 (docs only): add that output and the Actions run link to docs/evidence/week3.md, log this message as the next prompt marked ‘drafted with help from Claude in a separate chat’, and show me git diff --stat. Don’t commit until I approve. Don’t push.
+```
+</details>
+
+<details><summary>34. C4 approval and push (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Approved. Keep prompt 32 and add the label ‘drafted with help from Claude in a separate chat’ to it. Log this message as prompt 34 with the same label. Commit C4 with the message you proposed (adjust the prompt numbers in it to 32-34), then push feature/week3-ml-pipeline (no force). Show me the push output, git status, git log --oneline -3 and the full hash of the final head.
+```
+</details>
+
 ### My decisions and corrections
 
 | Phase | Options I was given | What I decided or added |
