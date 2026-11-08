@@ -43,7 +43,7 @@ limits), the [analysis](docs/ml/eda.md) (training data only) and the [model repo
   malformed, out-of-range and unknown fields, and returns the prediction, probability and model version
 - [x] **Dashboard card** on `/profile`, labelled as an educational demo, never medical advice
 - [x] **Week 1 and Week 2 still work**: all 278 earlier backend tests and 24 frontend tests still pass
-- [x] **Tests**: 149 new backend tests (427 in total) and 23 new frontend tests (47 in total)
+- [x] **Tests**: 151 new backend tests (429 in total) and 23 new frontend tests (47 in total)
 - [x] **Trade-offs documented** (below)
 
 ### How it fits together
@@ -105,6 +105,14 @@ In plain words: the chosen model catches about half of the fictional no-shows (9
 flags are right. That is modest on purpose: even a model that knew the rule exactly could only reach ROC-AUC 0.639 on
 these rows, because the noise and the final coin flip cannot be predicted.
 
+**What the 0.22 cutoff means.** The 22% line is a decision threshold, chosen on the validation rows (best F1) and then
+frozen. It is not a prediction that the person will miss: an estimate above it suggests an **extra reminder**, not a
+certain no-show. On the 900 test rows the model flagged 322 fictional appointments. 95 of them were real no-shows
+(precision 29.5%); the other 227 would get a reminder they did not need (false reminders). It caught 95 of the 187
+no-shows (recall 50.8%), so 92 missed appointments would get no extra reminder (missed reminders). A lower line
+catches more no-shows but sends more unneeded reminders; a higher line does the opposite. The card says the same
+thing next to every result. Source: section 6 of the [model report](docs/ml/model-report.md).
+
 | Comparison on validation (PR-AUC) | Difference | 95% interval | Clearly better? |
 |---|---|---|---|
 | Logistic regression vs baseline | +0.100 | +0.062 to +0.158 | yes |
@@ -148,7 +156,7 @@ python -m ml.experiment                                         # rebuild the mo
 python -m ml.train --check                                      # rebuild the model in memory and compare; writes nothing
 python -m ml.train                                              # write the model files (then review EXPECTED_SHA256)
 
-python -m pytest                    # 427 passed (278 Week 1–2 + 149 Week 3), about 2 minutes
+python -m pytest                    # 429 passed (278 Week 1–2 + 151 Week 3), about 2–4 minutes
 ML_SKIP_SLOW=1 python -m pytest     # skips the 7 slow retraining tests locally (they run by default)
 ```
 
@@ -208,6 +216,10 @@ The same request with `lead_time_days: 120`, `weekday: "sunday"`, `hour` left ou
 | 429 | More than 30 requests a minute from the same member |
 | 503 | `model_unavailable`: the checksum-verified model could not be loaded |
 
+The server enforces each of these itself, not only the card. Six real responses (200, 400, 400 for an unknown `role`
+field, 403 without the CSRF header, 401 signed out, 401 for an admin session), captured by a script over real HTTP, are in
+[docs/evidence/week3.md](docs/evidence/week3.md#server-enforcement-mentor-review).
+
 ### Limitations and future work (Week 3)
 
 - **Synthetic data only.** The model rediscovers rules we wrote; it is not evidence about real appointments.
@@ -261,7 +273,7 @@ Week 2 (the assignment):
 | Frontend | Next.js (App Router) + TypeScript | Proxies `/api/*` to Django, so the browser sees one origin |
 | API docs | drf-spectacular (Swagger at `/api/docs/`) | Click-through, testable docs |
 | ML (Week 3) | scikit-learn 1.9.1, pandas, numpy, joblib (exact pins in `requirements.txt`) | One Pipeline for preprocessing + model, reproducible with fixed seeds |
-| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 427 backend tests (278 Week 1–2 + 149 Week 3), 47 frontend tests (24 Week 1–2 + 23 Week 3) |
+| Tests | pytest + pytest-django (+ freezegun); Vitest + Testing Library | 429 backend tests (278 Week 1–2 + 151 Week 3), 47 frontend tests (24 Week 1–2 + 23 Week 3) |
 
 ## Architecture
 
@@ -698,7 +710,7 @@ Real secrets live only in `backend/.env`, which is **git-ignored** and never com
 
 ```bash
 cd backend
-python -m pytest        # 427 passed (278 Week 1–2 + 149 Week 3; the Week 3 test files are listed under "What is new in Week 3")
+python -m pytest        # 429 passed (278 Week 1–2 + 151 Week 3; the Week 3 test files are listed under "What is new in Week 3")
 ```
 
 | File | What it proves |
@@ -920,7 +932,7 @@ Week 1 example (still valid): `POST /api/auth/user/login/` with `{ "email": "mom
 | | |
 |---|---|
 | ![Demo card with a result](docs/screenshots/week3/card-result.png) | ![Swagger request](docs/screenshots/week3/swagger-request.png) |
-| The demo card after "Check this example" on the prefilled fictional appointment: 52.8% chance, a bar, "likely to be missed", the model version and the disclaimer | Swagger: the *ml demo (educational)* endpoint, its disclaimer and the request example |
+| The demo card after "Check this example" on the prefilled fictional appointment: "52.8% chance this fictional appointment is missed", a bar, "Above the 22% line: this suggests an extra reminder, not a certain no-show.", the model version and the disclaimer | Swagger: the *ml demo (educational)* endpoint, its disclaimer and the request example |
 | ![Swagger responses](docs/screenshots/week3/swagger-responses.png) | ![Quick check, light](docs/screenshots/week3/card-light.png) |
 | Swagger: the real 200 example and what 400, 401, 403, 429 and 503 mean | The card's quick check in light mode: 91 days is refused before anything is sent ("Enter a whole number from 0 to 90.") |
 | ![Quick check, dark](docs/screenshots/week3/card-dark.png) | |

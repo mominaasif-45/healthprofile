@@ -132,3 +132,105 @@ on 4 November 2026. The commit that adds this section changes only documentation
 | 7 | `npm test` | `Test Files 6 passed (6)`, `Tests 47 passed (47)` |
 | 8 | `npm run lint` | exit 0, no problems reported |
 | 9 | `npm run build` | `✓ Compiled successfully`, `✓ Generating static pages (11/11)` |
+
+## Server enforcement (mentor review)
+
+The PR #4 review asked for proof that the **server** enforces the rules, because the card's own range check alone
+cannot show that. These six responses were **captured by a script over real HTTP, not in the browser**, on
+8 November 2026:
+
+* `python manage.py runserver` on `http://127.0.0.1:53028`, with the code of `a1e96ce` (no code changes in the
+  working tree).
+* A throwaway member (made with `create_user`) and a throwaway admin (made with `manage.py create_admin`), both with
+  random passwords that were never printed, logged or saved.
+* The client used real cookies: it fetched `/api/csrf/`, signed in through `/api/auth/user/login/` or
+  `/api/admin/login/`, and sent the `X-CSRFToken` header except in case 4.
+* Every request is `POST /api/ml/v1/no-show/predict/` with the Swagger example body "Fictional appointment (likely
+  no-show)", changed only where the label says.
+* The script is [`docs/evidence/capture_enforcement.py`](capture_enforcement.py) (evidence tooling, not part of the
+  app). It contains no passwords, tokens or secrets and never opens `backend/.env`. Run it from the repository root
+  with the backend venv active: `python docs/evidence/capture_enforcement.py`. The copy in the repo differs from the
+  one that ran in two places only: it finds `backend/` from its own location instead of a fixed path on my computer,
+  and the wording of its cleanup line is corrected.
+
+Afterwards both accounts were signed out and deleted (0 left), and the server was stopped. `netstat -ano` then showed
+no listener on port 53028, only closed connections in `TIME_WAIT`. The audit log is append-only, so the admin's
+sign-in and sign-out rows (`admin.login`, `admin.logout`) remain, with the actor now empty. They contain no values.
+
+| # | Request | Expected | Real |
+|---|---|---|---|
+| 1 | Valid example, signed-in member | 200 | **200** |
+| 2 | `lead_time_days: 91`, member | 400 | **400** |
+| 3 | Extra field `role: "admin"`, member | 400 "Unknown field." | **400** "Unknown field." |
+| 4 | Member, no `X-CSRFToken` header | 403 | **403** |
+| 5 | Signed out (CSRF cookie and header, no sign-in) | 401 | **401** |
+| 6 | Admin session (`sessionid` cookie and `X-CSRFToken`) | 401 | **401** |
+
+**The wrong-role case is 401, not 403.** This endpoint accepts only the member JWT cookie. An admin's session cookie
+is not a credential here at all, so the server treats the admin as not signed in (401), the same as on every member
+route. 403 is used only when a signed-in member leaves out the CSRF header (case 4).
+
+```text
+=== (1 valid Swagger example, member) expected 200, got HTTP 200: as expected
+{"prediction": "likely_no_show", "probability": 0.5279, "threshold": 0.22, "model_version": "noshow-1.0.0",
+ "disclaimer": "Educational demo trained on synthetic data. Not medical advice, not a diagnosis, and not a prediction about any real person or appointment."}
+
+=== (2 lead_time_days 91, member) expected 400, got HTTP 400: as expected
+{"error": {"code": "validation_error", "message": "Invalid input.",
+  "fields": {"lead_time_days": ["Must be between 0 and 90."]},
+  "request_id": "5c6b6fb4-c84c-4493-b5c1-e87032546e47"}}
+
+=== (3 extra field role: 'admin', member) expected 400, got HTTP 400: as expected
+{"error": {"code": "validation_error", "message": "Invalid input.",
+  "fields": {"role": ["Unknown field."]},
+  "request_id": "74843088-714f-437f-b336-d69a21860bb4"}}
+
+=== (4 member, no X-CSRFToken header) expected 403, got HTTP 403: as expected
+{"error": {"code": "permission_denied", "message": "CSRF failed: CSRF token missing.", "fields": {},
+  "request_id": "640c0bb8-ae12-4dbb-9838-b6defc74a559"}}
+
+=== (5 signed out (CSRF cookie + header, no sign-in)) expected 401, got HTTP 401: as expected
+{"error": {"code": "not_authenticated", "message": "Authentication credentials were not provided.", "fields": {},
+  "request_id": "01b1d79b-618e-4640-b4c7-e7c0612ab5ef"}}
+
+=== (6 admin session (sessionid + X-CSRFToken)) expected 401, got HTTP 401: as expected
+{"error": {"code": "not_authenticated", "message": "Authentication credentials were not provided.", "fields": {},
+  "request_id": "31440307-8f8f-4854-bf8d-e56a4bd19fc5"}}
+
+all six statuses as expected
+```
+
+(The script printed each body indented over several lines; it is shown here on fewer lines, with nothing changed.)
+The same cases are also covered by automated tests in `backend/tests/test_ml_api.py`.
+
+## Prompt refinement and the test that failed first (mentor review)
+
+The PR #4 review asked for a link to one exact prompt refinement and to the test that failed before the fix. The
+links point at `5f3a820`, a commit that is already pushed, so the line numbers cannot move.
+
+* **The refinement: Week 2 prompt 12**
+  ([docs/ai-workflow.md, lines 358–363](https://github.com/mominaasif-45/healthprofile/blob/5f3a8203568080512a8444a13f0b62bbc7b66686/docs/ai-workflow.md?plain=1#L358-L363)).
+  Prompt 11 only asked for a plan for the contact deletion race. Prompt 12 tightened it in two ways:
+  * it required tests E and F to be **shown failing on the current code with `-rs`** (so a skip could not pass for a
+    success) before any fix;
+  * it added the same gap in `update_contact` (a PATCH losing to a delete gave a 500), with its own test, G.
+* **The tests that failed before the fix:**
+  [`test_e_contact_made_primary_after_the_delete_read_it`](https://github.com/mominaasif-45/healthprofile/blob/5f3a8203568080512a8444a13f0b62bbc7b66686/backend/tests/test_concurrency.py#L351),
+  [`test_f_…`](https://github.com/mominaasif-45/healthprofile/blob/5f3a8203568080512a8444a13f0b62bbc7b66686/backend/tests/test_concurrency.py#L377)
+  and
+  [`test_g_…`](https://github.com/mominaasif-45/healthprofile/blob/5f3a8203568080512a8444a13f0b62bbc7b66686/backend/tests/test_concurrency.py#L399)
+  in `backend/tests/test_concurrency.py`.
+* **Their saved failing output** on the old code `96e29a2`, which shows E left zero primaries, F's second delete
+  "succeeded", and G hit a 500:
+  [docs/evidence/week2-review.md, lines 159–165](https://github.com/mominaasif-45/healthprofile/blob/5f3a8203568080512a8444a13f0b62bbc7b66686/docs/evidence/week2-review.md?plain=1#L159-L165).
+  With the fix (`dbe41db`, merged into this branch at `8835d56`) the same command gives `3 passed`.
+
+## Test counts after the card wording change
+
+Run on 8 November 2026 on the code of `a1e96ce` (no code changes in the working tree), `ML_SKIP_SLOW` not set:
+
+```text
+python -m pytest -rs: 429 passed in 205.86s (0:03:25)    (278 Week 1–2 + 151 Week 3; C1 added 2 report tests)
+```
+
+The frontend count is unchanged: 47 tests (23 for the card).

@@ -674,6 +674,89 @@ Approved: use the evidence section as drafted, and also update the ‘Which comm
 When the numbering in prompts 23 and 24 overlapped, Claude Code asked how to log them, and I chose to log all three
 messages as 22 to 24.
 
+<details><summary>25. Stage 3 plan request: mentor's PR #4 evidence points (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Stage 3 plan, please. Do not change anything yet. My mentor’s review of PR #4 asks for: (a) a direct API 400 and a wrong-role or CSRF denial added to the demo evidence, because client range validation alone cannot prove server enforcement; (b) a link to the exact AI prompt refinement and the test that failed before the fix; (c) an explanation of the false-reminder / missed-reminder trade-off at the selected 0.22 cutoff, and that the 22% is a decision threshold chosen on validation where an estimate above it suggests an extra reminder, not a certain no-show; (d) a short timestamped clip showing both a successful request and a rejected request.
+
+Please propose:
+
+For (a): which existing tests in tests/test_ml_api.py already prove the 400, the CSRF denial and the wrong-role or unauthenticated denial (names and what they assert), and the exact steps for me to capture REAL responses myself in the browser console with both servers running (success 200, a malformed 400, a request without the CSRF header, and a request from an admin or signed-out session). I need the exact text to paste and the exact status codes we expect.
+For (b): which prompt refinement in docs/ai-workflow.md is the best example (with its prompt number and commit), and which test failed before the fix, with its real failing output saved in the evidence file. Link both to the tested commit.
+For (c): a short README and model-report paragraph in plain words with our real numbers (precision 29.5%, recall 50.8%, threshold 0.22), and whether we should also change the card’s wording to ‘suggests an extra reminder, not a certain no-show’. If so, list the files and tests that would change. Do not do it yet.
+For (d): a step-by-step shot list for a 1 to 2 minute clip with the timestamps I should note, and where to put the link and timestamps in the PR.
+Which commits this will add, and how we name the final tested commit.
+
+Also log this message as prompt 25, marked ‘drafted with help from Claude in a separate chat’. Don’t commit and don’t push.
+```
+</details>
+
+<details><summary>26. Stage 3 decision and C1 (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Go for Stage 3. Answers: (1) yes, change the card wording, and I will retake card-result.png myself; (2) Week 2 prompt 12 only; (3) both the admin private window and the signed-out case.
+
+Corrections: (i) do not use the word ‘patient’ anywhere, in the README, the report paragraph or the card. Say ‘the person’ or ‘this fictional appointment’. (ii) In the console snippet, rename URL to ENDPOINT so it can’t clash with the browser’s built-in, and tell me to paste the block only once per page load.
+
+Do C1 first: update the tests first, show them failing, then make the card wording change and the report-paragraph change in experiment.py (numbers computed from the results, not typed in), show them passing, regenerate the report, and run npm test, lint, build and the full backend suite. Show me the real outputs and git diff --stat. Don’t commit until I approve. Then give me the final exact steps for the six console captures, the screenshot retake and the clip. Log this message as prompt 26, marked ‘drafted with help from Claude in a separate chat’. Don’t push.
+```
+</details>
+
+<details><summary>27. C1 approval (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Approved. Commit C1 as proposed (the five code and report files only) with the message feat(ml,frontend): explain the 0.22 cutoff as a reminder threshold, not a certain no-show. Leave the prompt log uncommitted for C2, and log this message as prompt 27, marked ‘drafted with help from Claude in a separate chat’. Leave the older ‘No real patient data’ disclaimers as they are. Show me git status and the full hash. Don’t push.
+```
+</details>
+
+<details><summary>28. Plan request: PostgreSQL race tests in CI, mentor's PR #3 review (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Plan only, change nothing. My mentor’s review of PR #3 asks: ‘Keep these PostgreSQL tests active in a reproducible check/CI job. test_concurrency.py intentionally skips on non-PostgreSQL databases, so a green SQLite run cannot validate this fix. Show the database backend and skip summary in review evidence and fail the dedicated job if the intended race cases do not execute.’ He also asks for the race tests to be run on the Week 3 head, with the tested commit identified. He has said I do not need to record any follow-up clips.
+
+Please propose:
+
+Whether a .github/workflows/ folder already exists, and what we have today.
+A GitHub Actions workflow with a PostgreSQL service for tests/test_concurrency.py: which Python and PostgreSQL versions, how the database settings reach Django WITHOUT my .env (throwaway CI-only values written in the workflow, never a real password), how it prints the database backend and server version, and how it FAILS if any race test is skipped or if fewer than the expected number of tests run.
+How we prove locally that the guard really fails, for example by running the tests against SQLite and showing the guard logic fails.
+A second job for the full backend suite and the frontend tests, if that is cheap, or a reason to leave it out.
+The command and real output I should record in the evidence on the final Week 3 head: python -m pytest tests/test_concurrency.py -rs -v, with the database vendor printed.
+Which files change, the blast radius (config only, no application code), and the order of commits together with the pending evidence commit (C2: the README paragraph, the six console captures, the new card-result.png caption, and the prompt log).
+What I should expect to see on GitHub’s Actions tab after a push, and what could go wrong.
+
+Log this message as prompt 28, marked ‘drafted with help from Claude in a separate chat’. Don’t commit and don’t push.
+```
+</details>
+
+<details><summary>29. CI decision: race-test job and guard only (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Go for the CI work. Answers: (1) yes, add .github/ with the official actions and the postgres:17 image; (2) no extra jobs for now, only the race-test job and its guard, because the mentor asked only for that and the ML tests may differ across operating systems; (3) use -vv; (4) the C2, C3, C4 order is fine.
+
+Please: write the workflow and the guard script as planned, show me the two files, then run section 3 locally (SQLite must make the guard FAIL, the 8-test run must FAIL, the full PostgreSQL run must PASS) and show me the real outputs including the exit codes. Do not commit anything until I approve your report. Log this message as the next prompt, marked ‘drafted with help from Claude in a separate chat’. Don’t push.
+```
+</details>
+
+<details><summary>30. CI files approved; server-enforcement capture and C2 (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Approved: the two CI files as written. Next, in this order:
+
+Capture the server-enforcement evidence with a throwaway script (outside the committed code, or clearly marked as evidence tooling): start the backend on a free port, create a throwaway member and a throwaway admin with random passwords that you never print, log or save, and never read my .env. Send six requests to POST /api/ml/v1/no-show/predict/ over real HTTP with a CSRF-enforcing client and print label, status and JSON body for each: (1) valid body as the member → 200; (2) lead_time_days 91 → 400; (3) extra field role: 'admin' → 400 ‘Unknown field.’; (4) member without the CSRF header → 403; (5) signed out → 401; (6) admin session → 401. Use the Swagger example body. Delete the throwaway accounts and stop the server afterwards and confirm with netstat. If any status differs from what I expect, say so instead of adjusting it.
+Prepare C2 (docs only) and SHOW ME the diff before committing: the README paragraph on the 0.22 cutoff (use the numbers from the model report), the new caption for card-result.png, the test counts (429 backend), and docs/evidence/week3.md sections for ‘Server enforcement (mentor review)’ with the six results, labelled clearly as captured by a script over real HTTP, not in the browser, and saying the wrong-role case is 401, not 403. Also link the prompt refinement (Week 2 prompt 12) and the test that failed before the fix with its saved failing output, using links to a commit that is already pushed (5f3a820) and checking the line anchors against that commit.
+Log this message as the next prompt, marked ‘drafted with help from Claude in a separate chat’.
+
+Commit C2 and then C3 (only the two .github files) only after I approve your report. Don’t push.
+```
+</details>
+
+<details><summary>31. C2 and C3 approval (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Approved. Two changes before you commit: (1) change the README’s backend test time to ‘about 2–4 minutes’; (2) copy the capture script into the repo as docs/evidence/capture_enforcement.py (confirm that it contains no passwords, tokens or .env access), and mention it in the ‘Server enforcement’ section of docs/evidence/week3.md with its path. Log this message as prompt 31, marked ‘drafted with help from Claude in a separate chat’. Then commit C2 and C3 as proposed, and show me git log --oneline -4, git status and the full hashes. Do not push.
+```
+</details>
+
 ### My decisions and corrections
 
 | Phase | Options I was given | What I decided or added |
