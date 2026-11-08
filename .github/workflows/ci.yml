@@ -1,0 +1,79 @@
+name: CI
+
+# Runs on every push (so the run tests the exact commit that was pushed) and on demand.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Throwaway CI-only values, not secrets. The database below lives only inside this job's runner
+  # and is destroyed when the job ends. backend/.env is never used or created here.
+  SECRET_KEY: ci-only-not-a-secret-django-key
+  JWT_SIGNING_KEY: ci-only-not-a-secret-jwt-key
+  DEBUG: "False"
+  DATABASE_URL: postgres://healthprofile_ci:ci_only_throwaway@localhost:5432/healthprofile_ci
+  # tests/test_concurrency.py: test A x3 (parametrized) + B, C, D, E, F, G. Change this on purpose
+  # when a race test is added or removed.
+  EXPECTED_RACE_TESTS: "9"
+
+jobs:
+  race-tests:
+    name: Race tests (PostgreSQL 17)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: healthprofile_ci
+          POSTGRES_PASSWORD: ci_only_throwaway
+          POSTGRES_DB: healthprofile_ci
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U healthprofile_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend requirements
+        run: pip install -r requirements.txt
+
+      - name: Show tested commit
+        run: "git log -1 --format='Tested commit: %H %s'"
+
+      - name: Show database backend (must be PostgreSQL)
+        run: >-
+          python -c "import os, django;
+          os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings');
+          django.setup();
+          from django.db import connection as c;
+          cur = c.cursor();
+          print('vendor:', c.vendor);
+          assert c.vendor == 'postgresql', 'the database is not PostgreSQL';
+          cur.execute('SELECT version()');
+          print('server:', cur.fetchone()[0])"
+
+      - name: Run race tests
+        run: python -m pytest tests/test_concurrency.py -rs -vv --junitxml=race-results.xml
+
+      - name: Fail unless every race test really ran
+        run: python ../.github/scripts/check_race_run.py race-results.xml "$EXPECTED_RACE_TESTS"
