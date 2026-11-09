@@ -969,3 +969,25 @@ Approved. Commit Phase 1 as proposed. Log this message as prompt 6, marked ‘dr
 Go for Phase 2 as planned. First amend the last commit’s message only, to say 29 tests instead of 33 (no file changes), and tell me the new hash. One addition: if the silhouette scores are low, or k=2 wins by default, say so plainly in the report with the numbers, and treat it as weak structure. Do not tune features, scaling or k to make the clusters look better; the k rule was fixed in advance. If you move the shared logic of the workbench and clusters endpoints into a base view, all the existing workbench endpoint tests must still pass unchanged. Tests first, shown failing, then passing; do the three break-it checks; run the full regression list and show me real outputs, timing and peak memory. Don’t commit until I approve. Don’t push. Log this message as the next prompt, marked ‘drafted with help from Claude in a separate chat’.
 ```
 </details>
+
+<details><summary>8. Phase 2 commit, then Phase 3 (LLM endpoint) in one step (drafted with help from Claude in a separate chat)</summary>
+
+```text
+New session. This is the HealthProfile Week 4 worktree (branch feature/week4-ml-llm-rag). Before doing anything, read docs/ai-workflow.md, docs/ml/workbench-report.md and docs/ml/clusters-report.md, and run `git --no-pager log --oneline -5` and `git status`. Phase 1 (workbench) is committed as af7ecbf. Phase 2 (clusters) is built and passing (485 backend tests) but uncommitted, and I have approved committing it.
+
+Approved. Commit Phase 2 now with this exact message: "feat(ml): Week 4 exploratory clusters (K-Means + Agglomerative on engagement features, elbow, silhouette, PCA)". Do not push.
+
+Then build Phase 3 (LLM endpoint) as one step. Do not wait for a separate "go". The design I approved earlier: local Ollama (llama3.2:3b) behind a provider adapter in a new backend/llm/ app, with a `fake` provider as the default in tests and CI, and `ollama` used only when I set it in my own .env. Rules:
+
+1. Tests first. Write them, run them, and show me they FAIL before you write any code. Then implement until they pass.
+2. Scope: the system prompt, a max-tokens limit, temperature, strict JSON schema validation of the model's reply, POST /api/llm/v1/faq/ask/, a scoped throttle, a timeout, safe error responses (no stack traces, no raw model text on failure), and token and cost fields in the response (tokens from Ollama's own counts; cost is 0.00 for local, and say so). No retrieval yet. That is Phase 4.
+3. Safety: no patient-identifiable data may ever be sent to the model. Add a test that proves the endpoint refuses or strips it. Authentication is required. Treat any text passed in as untrusted data.
+4. Run one REAL call against Ollama and measure the actual response time and peak memory. Set the timeout from what you measured, and tell me the numbers. If Ollama is not reachable, tell me. Do not fake it.
+5. Do three deliberate break-it checks (for example: remove the schema validation, remove the throttle, send a patient-identifiable field) and show which test catches each one. Restore the files byte-for-byte.
+6. Run the full regression list as before: pytest (none skipped), the 9 race tests, makemigrations --check, ml.train --check SHA, the frozen Week 3 files diff, spectacular --validate --fail-on-warn, lint, vitest, build. Include timing and peak memory.
+7. Do NOT commit Phase 3. Report to me first. Do not push.
+8. Log this message as the next prompt in docs/ai-workflow.md with the mark "drafted with help from Claude in a separate chat".
+
+Never read, print or share .env or any password. Report the same way as before: what passed, what you were unsure about, and what I should check with my own eyes.
+```
+</details>

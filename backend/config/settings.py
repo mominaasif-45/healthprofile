@@ -100,7 +100,8 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
-    "DEFAULT_THROTTLE_RATES": {"login": "5/min", "ml_predict": "30/min", "ml_reports": "60/min"},
+    "DEFAULT_THROTTLE_RATES": {"login": "5/min", "ml_predict": "30/min", "ml_reports": "60/min",
+                               "llm_ask": "10/min"},
            "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
 }
 
@@ -138,6 +139,16 @@ CSRF_COOKIE_HTTPONLY = False            # frontend must read it to send X-CSRFTo
 CSRF_TRUSTED_ORIGINS = env.list(
     "CSRF_TRUSTED_ORIGINS", default=["http://localhost:3000", "http://127.0.0.1:3000"]
 )
+
+# ---------- LLM FAQ assistant (Week 4) ----------
+# "fake" (default: tests and CI, no network) or "ollama" (a local Ollama server; set it in your own .env only).
+LLM_PROVIDER = env("LLM_PROVIDER", default="fake")
+LLM_BASE_URL = env("LLM_BASE_URL", default="http://127.0.0.1:11434")  # must be this machine (checked)
+LLM_MODEL = env("LLM_MODEL", default="llama3.2:3b")
+LLM_TIMEOUT_SECONDS = env.float("LLM_TIMEOUT_SECONDS", default=75.0)  # measured: cold 28-36 s, warm 7-11 s (CPU)
+LLM_MAX_TOKENS = 200        # reply limit (Ollama num_predict)
+LLM_TEMPERATURE = 0.2       # low: short factual answers, little variation
+LLM_CONTEXT_TOKENS = 2048   # small fixed context window keeps the local model's memory low
 
 # ---------- API docs (Swagger) ----------
 SPECTACULAR_SETTINGS = {
