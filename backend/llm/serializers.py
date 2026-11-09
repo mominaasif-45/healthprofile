@@ -48,8 +48,10 @@ class UsageResponse(serializers.Serializer):
     prompt_tokens = serializers.IntegerField(allow_null=True)
     completion_tokens = serializers.IntegerField(allow_null=True)
     total_tokens = serializers.IntegerField(allow_null=True)
-    source = serializers.ChoiceField(choices=["provider", "estimate"],
-                                     help_text="provider: counted by the model server; estimate: about 4 characters per token.")
+    source = serializers.ChoiceField(
+        choices=["provider", "estimate", "none"],
+        help_text="provider: counted by the model server; estimate: about 4 characters per token; none: the model "
+                  "was not called (nothing relevant was found). Embedding calls are not counted.")
 
 
 class CostResponse(serializers.Serializer):
@@ -58,9 +60,29 @@ class CostResponse(serializers.Serializer):
     note = serializers.CharField()
 
 
+class CitationResponse(serializers.Serializer):
+    chunk_id = serializers.CharField(help_text="A chunk that was sent to the model; the quote was found in it.")
+    document_id = serializers.IntegerField()
+    document_title = serializers.CharField()
+    quote = serializers.CharField()
+
+
+class RetrievalResponse(serializers.Serializer):
+    top_k = serializers.IntegerField()
+    min_similarity = serializers.FloatField()
+    chunk_size = serializers.IntegerField()
+    chunk_overlap = serializers.IntegerField()
+    embedding_model = serializers.CharField()
+    best_similarity = serializers.FloatField(allow_null=True)
+    chunks_sent = serializers.IntegerField()
+    unverified_citations_removed = serializers.IntegerField()
+
+
 class FaqAnswerResponse(serializers.Serializer):
     status = serializers.ChoiceField(choices=["answered", "insufficient_information", "out_of_scope"])
     answer = serializers.CharField()
+    citations = CitationResponse(many=True)
+    retrieval = RetrievalResponse()
     provider = serializers.CharField()
     model = serializers.CharField()
     prompt_version = serializers.CharField()
@@ -68,3 +90,21 @@ class FaqAnswerResponse(serializers.Serializer):
     cost = CostResponse()
     latency_ms = serializers.IntegerField()
     disclaimer = serializers.CharField()
+
+
+class PolicyUploadRequest(serializers.Serializer):
+    """For the docs only: the view checks the file itself (llm/extract.py)."""
+
+    file = serializers.FileField(help_text=".txt or .md, at most 200 KB, UTF-8 text, no personal details.")
+
+
+class PolicyUploadResponse(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    filename = serializers.CharField()
+    sha256 = serializers.CharField()
+    size_bytes = serializers.IntegerField()
+    chunks = serializers.IntegerField()
+    embedding_model = serializers.CharField()
+    chunk_size = serializers.IntegerField()
+    chunk_overlap = serializers.IntegerField()

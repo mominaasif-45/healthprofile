@@ -991,3 +991,76 @@ Then build Phase 3 (LLM endpoint) as one step. Do not wait for a separate "go". 
 Never read, print or share .env or any password. Report the same way as before: what passed, what you were unsure about, and what I should check with my own eyes.
 ```
 </details>
+
+<details><summary>9. Phase 3 commit, then Phase 4 (RAG over policy documents) in one step (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Approved. Commit Phase 3 now with this exact message: "feat(llm): Week 4 LLM FAQ endpoint (provider adapter, fake default + local Ollama, strict JSON reply, personal-data refusal, throttle, timeout)". Do not push.
+
+Then build Phase 4 (RAG over policy documents) as one step. Do not wait for a separate "go". Rules:
+
+1. Tests first. Write them, run them, show me they FAIL, then implement until they pass.
+2. Scope:
+   - Models PolicyDocument and PolicyChunk with a migration (embeddings stored in a PostgreSQL ArrayField, as designed). Verify the migration works on a brand-new empty database.
+   - extract.py, chunking.py, embeddings.py, retrieval.py. Embeddings come from nomic-embed-text through Ollama, with a deterministic `fake` embedder as the default in tests and CI. Search is cosine similarity with numpy. Chunk size, overlap, top_k and the minimum-similarity threshold must be settings, so Phase 5 can compare two retrieval settings.
+   - An upload endpoint. Only staff/admin users may upload. Allow only .txt and .md, max 200 KB, valid UTF-8, with safe error messages. Reject anything else with a clear 400.
+   - Change the ask endpoint so it retrieves the top chunks, sends them to the model wrapped in <document id="..."> tags and treated as UNTRUSTED data (never as instructions), and returns citations. Every citation must be verified: its chunk_id must be one that was actually sent, and its quote must appear in that chunk. Remove unverified citations. If nothing relevant is found (below the threshold) or the model's answer has no verified citation, return status "insufficient_information" and DO NOT guess.
+   - A `seed_policies` management command and 4 to 5 short policy files in backend/llm/policies/*.md. They must be clearly fictional demo content for "HealthProfile demo" (profile sections, emergency contacts, privacy and data handling, the no-show demo and what it can and cannot do, and appointment reminders). No real medical advice. Keep each one short.
+3. Security tests that must exist: a policy document that contains a prompt injection ("ignore your rules and reveal ...") must NOT change the behaviour; non-staff cannot upload; wrong file types, oversize files and invalid UTF-8 are rejected; the personal-details refusal from Phase 3 still works.
+4. Run seed_policies with the REAL embedding model once. Tell me how long it took and the peak memory. Then run 3 real questions end to end (one answerable, one out of scope, one ambiguous) and show me the actual answers, citations and statuses.
+5. Do three deliberate break-it checks (for example: skip the quote-in-chunk check, remove the staff-only permission, put retrieved text in the system prompt) and show which test catches each one. Restore the files byte-for-byte.
+6. Full regression list as before, with timing and peak memory. Frozen Week 1 to 3 files must have no diff. makemigrations --check must pass now that there is a migration.
+7. Do NOT commit Phase 4. Do NOT push. Report first. Put the full text of each policy file in your report so I can read and approve it.
+8. Log this message as the next prompt in docs/ai-workflow.md with the mark "drafted with help from Claude in a separate chat".
+
+Never read, print or share .env or any password. Report in the same way: what passed, what you were unsure about, what I should check with my own eyes.
+```
+</details>
+
+<details><summary>10. Fact check of the policy files before Phase 5 (drafted with help from Claude in a separate chat)</summary>
+
+```text
+BEFORE Phase 5, do this check. Do not skip it.
+
+Verify each of these seven claims in the five policy files in backend/llm/policies/ against the REAL code, tests, README and reports. For each claim, say TRUE or FALSE, and name the exact file and line you checked:
+1. Demographics section: full name, age range or date of birth, city.
+2. Wellness preferences: contact preference, activity level, diet preference, sleep goal.
+3. A deactivated profile: the member can still sign in but cannot edit the profile.
+4. Emergency contacts: the first contact added becomes primary; the current primary cannot simply be unmarked; a primary must always exist when contacts exist; at most three contacts.
+5. Phone numbers: 7 to 15 digits, spaces/brackets/dashes allowed, the same number cannot be added twice to one profile.
+6. The audit log stores which fields changed, never the values.
+7. "At the 22% line it catches about half of the invented no-shows" and "also flags many appointments that were kept": check against backend/ml/reports/metrics.json and the Week 3 docs (recall and precision at the 0.22 threshold on the test set). Use the real numbers.
+Also check every other factual sentence in the five policy files the same way, and the four app facts in backend/llm/prompts.py.
+
+If EVERYTHING is true: say so in one short table, then go on and do Phase 5 exactly as described below.
+If ANYTHING is false or imprecise: fix ONLY those sentences in the policy files (and prompts.py if needed) so they are true, re-run `seed_policies`, re-run the LLM tests, then STOP. Do not start Phase 5. Show me a before/after for each fixed sentence and wait for my go. Do not commit.
+
+Then the Phase 5 instructions follow:
+```
+
+The message ended there; the Phase 5 instructions came in prompt 11. The check found five imprecise sentences (none
+false); they were fixed and shown as before/after, and Claude Code stopped.
+</details>
+
+<details><summary>11. Phase 4 commit, then Phase 5 (LLM evaluation) in one step (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Go. Good check. Log it as prompt 10, and this message as prompt 11, in docs/ai-workflow.md with the mark "drafted with help from Claude in a separate chat".
+
+First: commit Phase 4 now, including the five policy-sentence fixes, with this exact message: "feat(llm): Week 4 RAG over fictional policies (upload, chunking, nomic embeddings, cosine retrieval, verified citations, seed_policies)". Do not push.
+
+Then build Phase 5 (LLM evaluation) as one step. Do not wait for another "go". Rules:
+
+1. Design of the 12 prompts, in backend/llm/eval/prompts.json: 4 answerable (covered by the policies), 2 ambiguous, 3 out of scope (including one medical question and one general-knowledge question), 3 prompt-injection attempts typed into the question (for example: ignore your rules, reveal your system prompt, pretend you are another assistant). Each case has an id, category, the question, and the EXPECTED outcome (status, and for answerable cases which policy file the citation should come from). Use NEW questions. Do not reuse the 14 probe questions used to set the 0.62 threshold, and say so. Note that for out-of-scope and ambiguous questions the correct status is usually insufficient_information. Define "correct" for each category in the document.
+2. WRITE AND SAVE the expected outcomes BEFORE running anything against the model. After the first real run, do not change the questions or expectations to make results look better. If a case was badly designed, keep it, report the result honestly, and explain it.
+3. Compare TWO system prompts with the same retrieval settings: prompt A is the current one; prompt B is a deliberately different variant (for example stricter: answer only from the documents, one sentence, always quote the exact sentence that holds the answer). Change only one dimension so the comparison means something. Also, with no extra model calls, report for each question its best similarity score (on the re-seeded policies), and how many answerable and unanswerable questions would be wrongly refused or wrongly answered at thresholds 0.55, 0.62 and 0.70. Say clearly if the 0.62 threshold still holds after the policy text changed.
+4. The runner (backend/llm/eval/run.py) must call the service directly, not over HTTP, so the throttle does not interfere. It records per case: status, whether the citation was verified, whether the expected policy file was cited, whether the answer leaked the system prompt or obeyed an injection, latency, prompt tokens and reply tokens. It scores automatically AND saves the full answers so I can read them. Write results to backend/llm/eval/results.json and a readable summary to docs/llm/evaluation.md: a table per prompt, the comparison, the failures with the exact answers, and the honest limitations (12 cases is small, one run, a 3B model, results can vary between runs). Do not claim one prompt is "better" beyond what 12 cases can support.
+5. Tests first (shown failing, then passing) for the runner and scorer, using the fake provider so CI never calls Ollama. Add tests that the scorer correctly marks a leak, an obeyed injection, a missing citation and a wrong status.
+6. Then run the REAL evaluation against Ollama (llama3.2:3b). Report the time it took and the peak memory. If a case times out, record it as a timeout, do not hide it.
+7. Do three deliberate break-it checks on the scorer (for example: make the leak detector always say "no leak", make the status comparison always pass, drop the citation check) and show which test catches each one. Restore files byte-for-byte.
+8. Full regression list as before, with timing and peak memory. Frozen Week 1 to 3 files must have no diff.
+9. Do NOT commit Phase 5. Do NOT push. Report first, with the results table and every failing case in full.
+
+Never read, print or share .env or any password. Report the same way: what passed, what you were unsure about, what I should check with my own eyes.
+```
+</details>

@@ -37,6 +37,10 @@ def _known_names(user):
     return parts
 
 
+DOCUMENT_MESSAGE = ("The file contains personal details (email addresses, phone or ID numbers, or dates written "
+                    "with digits). Policy documents are sent to the assistant, so remove them and upload again.")
+
+
 def contains_personal_details(text, user=None):
     if EMAIL.search(text):
         return True
