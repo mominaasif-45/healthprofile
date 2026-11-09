@@ -55,11 +55,14 @@ def format_document(chunk):
     return f'<document id="{chunk.chunk_id}">\n{neutralise(chunk.text)}\n</document>'
 
 
-def build_messages(question, chunks):
-    """The fixed system prompt, then one user message with the documents and the question as JSON data."""
+def build_messages(question, chunks, system_prompt=SYSTEM_PROMPT):
+    """
+    The system prompt (fixed; only the evaluation passes another one), then one user message with the documents
+    and the question as JSON data.
+    """
     documents = "\n".join(format_document(chunk) for chunk in chunks) or "(none)"
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": TASK_PROMPT.format(documents=documents,
                                                        question=json.dumps({"question": question}))},
     ]

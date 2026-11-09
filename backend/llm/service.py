@@ -62,17 +62,18 @@ def verify_citations(citations, sent):
     return verified, len(citations) - len(verified)
 
 
-def _leak_lines():
-    pieces = re.split(r"\n|(?<=\.) ", prompts.SYSTEM_PROMPT)
+def _leak_lines(system_prompt):
+    pieces = re.split(r"\n|(?<=\.) ", system_prompt)
     return [normalise(piece) for piece in pieces if len(normalise(piece)) >= LEAK_LINE_CHARS]
 
 
-def leaks_system_prompt(answer):
+def leaks_system_prompt(answer, system_prompt=prompts.SYSTEM_PROMPT):
     answer = normalise(answer)
-    return any(line in answer for line in _leak_lines())
+    return any(line in answer for line in _leak_lines(system_prompt))
 
 
-def ask(question):
+def ask(question, *, system_prompt=prompts.SYSTEM_PROMPT, prompt_version=prompts.SYSTEM_PROMPT_VERSION):
+    """The endpoint always uses the defaults; only the evaluation (llm/eval) passes another system prompt."""
     started = time.perf_counter()
     found = retrieval.retrieve(question)
     info = {
@@ -83,10 +84,10 @@ def ask(question):
     }
     if not found.chunks:
         return _response("insufficient_information", INSUFFICIENT_ANSWER, [], info, None, None, (0, 0, "none"),
-                         started)
+                         started, prompt_version)
 
     provider = providers.get_provider()
-    result = provider.complete(prompts.build_messages(question, found.chunks), schema=REPLY_SCHEMA,
+    result = provider.complete(prompts.build_messages(question, found.chunks, system_prompt), schema=REPLY_SCHEMA,
                                max_tokens=settings.LLM_MAX_TOKENS, temperature=settings.LLM_TEMPERATURE)
     reply = parse_reply(result.text)
     sent = {chunk.chunk_id: (chunk.document_id, prompts.neutralise(chunk.text)) for chunk in found.chunks}
@@ -94,18 +95,18 @@ def ask(question):
     info["unverified_citations_removed"] = removed
     usage = (result.prompt_tokens, result.completion_tokens, result.token_source)
 
-    if reply["status"] == "answered" and verified and not leaks_system_prompt(reply["answer"]):
+    common = (info, provider.name, result.model, usage, started, prompt_version)
+    if reply["status"] == "answered" and verified and not leaks_system_prompt(reply["answer"], system_prompt):
         by_id = {chunk.chunk_id: chunk for chunk in found.chunks}
         citations = [{"chunk_id": c["chunk_id"], "document_id": by_id[c["chunk_id"]].document_id,
                       "document_title": by_id[c["chunk_id"]].document_title, "quote": c["quote"]} for c in verified]
-        return _response("answered", reply["answer"], citations, info, provider.name, result.model, usage, started)
+        return _response("answered", reply["answer"], citations, *common)
     if reply["status"] == "out_of_scope":
-        return _response("out_of_scope", OUT_OF_SCOPE_ANSWER, [], info, provider.name, result.model, usage, started)
-    return _response("insufficient_information", INSUFFICIENT_ANSWER, [], info, provider.name, result.model, usage,
-                     started)
+        return _response("out_of_scope", OUT_OF_SCOPE_ANSWER, [], *common)
+    return _response("insufficient_information", INSUFFICIENT_ANSWER, [], *common)
 
 
-def _response(status, answer, citations, info, provider_name, model, usage, started):
+def _response(status, answer, citations, info, provider_name, model, usage, started, prompt_version):
     prompt_tokens, completion_tokens, source = usage
     total = None if None in (prompt_tokens, completion_tokens) else prompt_tokens + completion_tokens
     return {
@@ -115,7 +116,7 @@ def _response(status, answer, citations, info, provider_name, model, usage, star
         "retrieval": info,
         "provider": provider_name or "none",
         "model": model or "none",
-        "prompt_version": prompts.SYSTEM_PROMPT_VERSION,
+        "prompt_version": prompt_version,
         "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": total,
                   "source": source},
         "cost": dict(LOCAL_COST),
