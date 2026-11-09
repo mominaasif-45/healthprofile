@@ -11,6 +11,363 @@ All data in this project is synthetic.
 > **Demo environment.** Every profile is synthetic. No real patient data. Wellness goals only,
 > never diagnoses or medical advice.
 
+## What is new in Week 4
+
+Week 4 ("Comparative ML Workbench, Clustering, LLM Endpoint and FAQ Assistant") adds four things on top of Week 3, and
+one page that shows them:
+
+1. a **supervised workbench** that compares four models on the Week 3 synthetic appointments;
+2. **exploratory clusters** of booking behaviour;
+3. an **LLM endpoint** that runs a small local model (Ollama, `llama3.2:3b`) behind a provider adapter;
+4. an **educational FAQ assistant** that answers only from approved fictional policies, with verified citations (RAG);
+5. the **`/ml` dashboard** with three tabs (Supervised, Clusters, FAQ assistant), and a **12-case evaluation** of two
+   system prompts.
+
+> **Educational demo on synthetic data.** Not medical advice and not a diagnosis. The policies are fictional, the
+> model runs on this computer, and no profile data is ever sent to it. The shipped prediction model is still
+> `noshow-1.0.0` from Week 3.
+
+Real command output and every check: [docs/evidence/week4.md](docs/evidence/week4.md). Reports:
+[workbench](docs/ml/workbench-report.md), [clusters](docs/ml/clusters-report.md),
+[LLM evaluation](docs/llm/evaluation.md).
+
+### Feature checklist (Week 4)
+
+- [x] **Supervised workbench**: baseline, logistic regression, random forest (tuned with `RandomizedSearchCV`, 10 tries)
+  and histogram gradient boosting. Confusion matrix, precision, recall, F1, ROC-AUC, PR-AUC, train vs validation,
+  5-fold stratified cross-validation, permutation importance, false positive and false negative inspection, all in one
+  reproducible scikit-learn pipeline per model ([`ml/workbench.py`](backend/ml/workbench.py),
+  [report](docs/ml/workbench-report.md))
+- [x] **Every choice made on the validation pile only**; the test pile (already used once in Week 3) is reported
+  afterwards and never used to choose
+- [x] **Exploratory clusters**: K-Means (k = 2 to 8, elbow and silhouette) and Agglomerative (Ward) on five engagement
+  features only (no age band, distance band or no-show label), fitted on training rows only, with a 2D PCA view
+  ([`ml/clusters.py`](backend/ml/clusters.py), [report](docs/ml/clusters-report.md))
+- [x] **LLM endpoint** `POST /api/llm/v1/faq/ask/`: system prompt, task prompt, fixed context window (2,048 tokens),
+  token limit (300), temperature (0.2), strict JSON reply schema, throttle, timeout, safe errors, token counts and cost
+  ([`backend/llm/`](backend/llm/))
+- [x] **FAQ assistant over fictional policies**: admin-only upload (`.txt` / `.md`, 200 KB, UTF-8), text extraction,
+  chunking, `nomic-embed-text` embeddings stored in PostgreSQL, cosine search with numpy, cited passages, and an
+  explicit `insufficient_information` answer instead of a guess
+- [x] **12-case evaluation** (answerable, ambiguous, out of scope, prompt injection) comparing prompt A with a one-line
+  variant B, plus a re-check of the similarity threshold ([`llm/eval/`](backend/llm/eval/),
+  [report](docs/llm/evaluation.md))
+- [x] **`/ml` dashboard**: three keyboard-accessible tabs showing model versions, metrics and disclaimers; charts in
+  plain SVG with text labels; an upload panel for admins only
+- [x] **Weeks 1 to 3 still work**: the frozen Week 1 to 3 files have no diff, `noshow-1.0.0` is rebuilt byte for byte,
+  the 9 PostgreSQL race tests run with none skipped
+- [x] **Tests**: 229 new backend tests (658 in total) and 33 new frontend tests (80 in total)
+
+### How it fits together
+
+The FAQ assistant answers one question like this ([`llm/service.py`](backend/llm/service.py)):
+
+```
+question  POST /api/llm/v1/faq/ask/  (member JWT cookie + CSRF, 10 per minute)
+   │
+   ▼  1. strict input        only {"question": ...}, 3 to 500 characters; any other field is a 400
+   ▼  2. privacy check       an email address, 7 or more digits (phone, ID, a date in digits) or the member's own
+   │                         name -> 400, and nothing is sent anywhere
+   ▼  3. retrieval           embed the question (nomic-embed-text) -> cosine similarity against the stored chunks
+   │                         -> top 3 chunks with similarity >= 0.62. None -> insufficient_information (no model call)
+   ▼  4. untrusted prompt    fixed system prompt with the rules; each chunk goes in the USER message inside
+   │                         <document id="..."> tags marked as untrusted data; fake tags inside a chunk are defused
+   ▼  5. model               llama3.2:3b on local Ollama (127.0.0.1 only), temperature 0.2, at most 300 tokens,
+   │                         2,048-token context, 100 s timeout (504), unreachable (503)
+   ▼  6. schema check        the reply must be exactly {status, answer, citations[]}; anything else -> 502, raw text
+   │                         never shown
+   ▼  7. citation check      each quote must come from a chunk that was sent, appear in that chunk (ignoring case and
+   │                         spacing), be at least 12 characters, and not be boilerplate found in two or more
+   │                         documents; an answer that repeats the system prompt is dropped
+   ▼  8. answer              answered (with verified citations) | insufficient_information | out_of_scope, the last
+                             two as fixed sentences; plus retrieval settings, tokens, cost 0.00, time, disclaimer
+```
+
+The two report endpoints are simpler: `GET /api/ml/v1/workbench/` and `GET /api/ml/v1/clusters/` return the committed
+JSON reports (`backend/ml/reports/workbench.json`, `clusters.json`) that `python -m ml.workbench` and
+`python -m ml.clusters` write. They take no input and change nothing.
+
+| New in `backend/` | What it does |
+|---|---|
+| `ml/workbench.py`, `ml/models.py` (random forest + tuning added) | The supervised comparison and its report |
+| `ml/clusters.py` | Clusters, elbow, silhouette, PCA and the cluster report |
+| `ml/views.py` | One shared read-only view for both reports (members only, 60 per minute) |
+| `llm/providers.py` | The provider adapter: `fake` (default, no network) or `ollama` (urllib, local address only, proxies ignored) |
+| `llm/privacy.py`, `llm/prompts.py`, `llm/schema.py`, `llm/service.py` | The privacy check, the prompts, the reply schema, and the steps above |
+| `llm/extract.py`, `llm/chunking.py`, `llm/embeddings.py`, `llm/ingest.py`, `llm/retrieval.py`, `llm/models.py` | Upload checks, chunks of 600 characters with 100 overlap, embeddings, storage (PostgreSQL `float8[]`), search |
+| `llm/policies/*.md`, `llm/management/commands/seed_policies.py` | Five short fictional policies and the command that loads them |
+| `llm/eval/` | The 12 cases, prompt variant B, the scorer, the runner and its saved results |
+
+### Run it (Week 4)
+
+Start from "Run it locally" below; Week 4 adds no new packages. Then, in `backend/` with the venv active:
+
+```bash
+python manage.py migrate            # adds llm 0001 (policy documents and chunks)
+python manage.py seed_policies      # loads backend/llm/policies/*.md with the CURRENT embedder
+python manage.py runserver
+```
+
+and in `frontend/`: `npm run dev`, sign in as a member, and open **ML dashboard** in the side menu
+(http://localhost:3000/ml).
+
+**Fake or real model.** Out of the box `LLM_PROVIDER` is `fake`: no network, instant answers that say they come from
+the test assistant. Tests and CI always use it. To use the real local model:
+
+1. Install Ollama and pull the two models: `ollama pull llama3.2:3b` and `ollama pull nomic-embed-text`
+   (about 1.9 GB and 0.3 GB on disk). Check with `ollama list`.
+2. In **your own** `backend/.env`, add one line: `LLM_PROVIDER=ollama`. The embedder follows it (`LLM_EMBEDDER`
+   defaults to the provider). The other settings have working defaults: `LLM_BASE_URL=http://127.0.0.1:11434` (must be
+   this computer; the code refuses anything else), `LLM_MODEL=llama3.2:3b`, `LLM_EMBED_MODEL=nomic-embed-text`,
+   `LLM_TIMEOUT_SECONDS=100`.
+3. Run `python manage.py seed_policies` again. Search only uses chunks made by the current embedder, so this step is
+   needed after every embedder change. It prints `embedder: ollama:nomic-embed-text` and the counts.
+4. Restart `runserver` (it reads `.env` only at start) and `npm run dev`.
+5. Ask a question on the FAQ tab. Under the answer the page shows `Model: llama3.2:3b (ollama)`; with the fake
+   provider it shows `fake`.
+
+Rebuild the two reports (both are deterministic and compared against the committed files by tests):
+
+```bash
+python -m ml.workbench              # about 2.5 minutes, one CPU core
+python -m ml.clusters               # about 20 seconds
+python -m llm.eval.run              # the 12-case evaluation against the REAL model (about 6.5 minutes)
+```
+
+Tests:
+
+```bash
+cd backend
+python -m pytest                    # 658 passed (429 Weeks 1-3 + 229 Week 4), about 4 to 7 minutes on this laptop (final run: 7 min 12 s; other Week 4 runs 3 min 23 s to 6 min 26 s)
+cd ../frontend
+npm test                            # 80 passed (47 Weeks 1-3 + 33 Week 4)
+```
+
+| New test file | What it proves |
+|---|---|
+| `test_ml_workbench.py` (29) | Random forest is one pipeline on the Week 3 preprocessor; fill-in values come from training rows only; folds are stratified and inside the training pile; the tuning tried 10 settings and reports the real best; confusion matrices match scikit-learn; the choice uses validation only; the committed report matches a fresh run; Week 3 files untouched; the endpoint's 401 / 405 / 200 |
+| `test_ml_clusters.py` (27) | Exactly the 5 engagement features; scaler, PCA and K-Means fitted on the 4,200 training rows; the k rule; Ward and the agreement score; PCA points; no "risk group" or similar words; the committed report matches a fresh run; the endpoint |
+| `test_llm_faq.py` (78) | Sign-in, CSRF, the throttle; unknown fields refused; personal details refused and never sent; profile data never in the prompt; the reply schema (every bad reply gives 502); timeout 504, unreachable 503; local address only; tokens and cost; nothing logged |
+| `test_llm_rag.py` (73) | Upload: admins only, type, size, UTF-8, binary, personal details, duplicates, embedder down; chunking; retrieval and the threshold; documents in the user message, never the system prompt; injection inside a document; every citation rule; insufficient information; `seed_policies` |
+| `test_llm_eval.py` (22) | The 12 cases are new and saved first; prompt B changes exactly one line; the scorer marks a leak, an obeyed injection, a missing citation and a wrong status; timeouts are recorded |
+| `frontend/tests/ml-page.test.tsx`, `ml-lib.test.ts` (33) | Tabs and keyboard; versions, metrics and disclaimers from mocked responses; the thinking state and no double submit; citations; every error code maps to a fixed safe message; the upload is hidden from non-admins; banned words never appear |
+
+### API examples (real output)
+
+Sign in once with curl (cookies go to a jar; no token is ever in a body). Use your own fictional demo account:
+
+```bash
+curl -s -c jar.txt http://127.0.0.1:8000/api/csrf/ > /dev/null
+CSRF=$(awk '$6=="csrftoken" {print $7}' jar.txt)
+curl -s -b jar.txt -c jar.txt -H "X-CSRFToken: $CSRF" -H "Content-Type: application/json" \
+     -d '{"email": "momina.asif@example.com", "password": "<your password>"}' \
+     http://127.0.0.1:8000/api/auth/user/login/
+CSRF=$(awk '$6=="csrftoken" {print $7}' jar.txt)       # Django rotates the token at login
+```
+
+The same requests can be tried in Swagger at http://127.0.0.1:8000/api/docs/ (groups *ml demo (educational)* and
+*llm faq (educational)*).
+
+**Workbench** `GET /api/ml/v1/workbench/` (member, 60 per minute) → **200**, the committed report (abridged):
+
+```bash
+curl -s -b jar.txt http://127.0.0.1:8000/api/ml/v1/workbench/
+```
+
+```json
+{"version": "workbench-1.0.0",
+ "disclaimer": "Educational comparison on synthetic data. Not medical advice, not a diagnosis, and not a prediction about any real person or appointment. This report ships no model: the API still uses noshow-1.0.0.",
+ "test_pile_note": "The test pile was already used in Week 3 to report the baseline, logistic regression and gradient boosting, so it is no longer completely unseen. …",
+ "settings": {"split_seed": 42, "model_seed": 42, "cv_folds": 5, "rf_search_tries": 10, "permutation_repeats": 10,
+              "overfit_gap": 0.05, "leakage_margin": 0.03, "scikit_learn": "1.9.1", "shipped_model": "noshow-1.0.0"},
+ "pile_sizes": {"train": {"rows": 4200, "no_shows": 874}, "validation": {"rows": 900, "no_shows": 187}, "test": {"rows": 900, "no_shows": 187}},
+ "models": {"logistic_regression": {
+     "cv": {"rows": 4200, "pr_auc": {"mean": 0.3468, "sd": 0.0437, "folds": [0.3221, 0.2833, 0.4137, 0.3675, 0.3472]}, "…": "…"},
+     "validation": {"roc_auc": 0.6269, "pr_auc": 0.308, "threshold": 0.22, "precision": 0.3086, "recall": 0.5348,
+                    "f1": 0.3914, "tp": 100, "fp": 224, "fn": 87, "tn": 489, "…": "…"},
+     "gap": {"pr_auc": 0.0583, "overfit": true}, "…": "…"},
+   "baseline": {"…": "…"}, "random_forest": {"…": "…"}, "gradient_boosting": {"…": "…"}},
+ "best_on_validation": "random_forest",
+ "rf_search": ["… 10 settings …"], "importance": {"…": "…"}, "errors": {"…": "…"}, "test": {"…": "…"}}
+```
+
+**Clusters** `GET /api/ml/v1/clusters/` (member, 60 per minute) → **200** (abridged; `pca.points` holds 500 points):
+
+```json
+{"version": "clusters-1.0.0",
+ "disclaimer": "Exploratory analysis of synthetic data. Not medical advice and not a diagnosis. The clusters are not kinds of people and are not used for any decision or prediction.",
+ "features": ["lead_time_days", "prior_visits", "prior_no_shows", "reminder_sent", "booking_channel"],
+ "elbow": [{"k": 2, "inertia": 13408.2293, "silhouette": 0.2598}, {"k": 3, "inertia": 11094.3517, "silhouette": 0.2561}, "… k = 4 to 8 …"],
+ "chosen_k": 2,
+ "structure_note": "The chosen k is 2 with an average silhouette of 0.26, which reads as weak structure. …",
+ "kmeans": {"silhouette": 0.2598, "sizes": [3055, 1145]},
+ "agglomerative": {"k": 2, "linkage": "ward", "silhouette": 0.2191, "sizes": [2742, 1458], "adjusted_rand_vs_kmeans": 0.5938},
+ "validation": {"rows": 900, "sizes": [688, 212], "silhouette": 0.254},
+ "pca": {"explained_variance": [0.3298, 0.2467], "points": [[4.166, -0.502, 2], "…"]},
+ "summary": [{"cluster": 1, "rows": 3055, "share": 0.7274,
+              "description": "Books about as far ahead as average (12 days); less often has an earlier missed visit (9% vs 31%); mixed booking channels.", "…": "…"},
+             {"cluster": 2, "…": "…"}]}
+```
+
+**Ask** `POST /api/llm/v1/faq/ask/` (member + CSRF, 10 per minute):
+
+```bash
+curl -s -b jar.txt -H "X-CSRFToken: $CSRF" -H "Content-Type: application/json" \
+     -d '{"question": "How many emergency contacts can I add?"}' http://127.0.0.1:8000/api/llm/v1/faq/ask/
+```
+
+**200**, a real call with the local model on 10 November 2026 (cold start: the model had to load, so 74 s):
+
+```json
+{
+ "status": "answered",
+ "answer": "A member can add up to three emergency contacts to a profile.",
+ "citations": [
+  {
+   "chunk_id": "3",
+   "document_id": 2,
+   "document_title": "Emergency contacts",
+   "quote": "A member can add up to three emergency contacts to a profile."
+  }
+ ],
+ "retrieval": {
+  "top_k": 3,
+  "min_similarity": 0.62,
+  "chunk_size": 600,
+  "chunk_overlap": 100,
+  "embedding_model": "ollama:nomic-embed-text",
+  "best_similarity": 0.7841,
+  "chunks_sent": 3,
+  "unverified_citations_removed": 0
+ },
+ "provider": "ollama",
+ "model": "llama3.2:3b",
+ "prompt_version": "faq-system-2",
+ "usage": {
+  "prompt_tokens": 706,
+  "completion_tokens": 54,
+  "total_tokens": 760,
+  "source": "provider"
+ },
+ "cost": {
+  "amount": "0.00",
+  "currency": "USD",
+  "note": "Local model on this computer: no per-token charge. Hardware and electricity are not counted."
+ },
+ "latency_ms": 73753,
+ "disclaimer": "Educational demo on synthetic data. Answers come only from fictional HealthProfile demo policies: not medical advice, not a diagnosis, and not a decision about any real person."
+}
+```
+
+**200** for `"What is the capital of France?"`: no passage reached 0.62 (best 0.4742), so the model was **not called**:
+
+```json
+{
+ "status": "insufficient_information",
+ "answer": "I could not find this in the approved HealthProfile demo policies, so I will not guess. Try rephrasing, or ask about a topic the policies cover.",
+ "citations": [],
+ "retrieval": {
+  "top_k": 3,
+  "min_similarity": 0.62,
+  "chunk_size": 600,
+  "chunk_overlap": 100,
+  "embedding_model": "ollama:nomic-embed-text",
+  "best_similarity": 0.4742,
+  "chunks_sent": 0,
+  "unverified_citations_removed": 0
+ },
+ "provider": "none",
+ "model": "none",
+ "prompt_version": "faq-system-2",
+ "usage": {
+  "prompt_tokens": 0,
+  "completion_tokens": 0,
+  "total_tokens": 0,
+  "source": "none"
+ },
+ "cost": "… same as above …",
+ "latency_ms": 228,
+ "disclaimer": "… same as above …"
+}
+```
+
+**400** for `"Please email me at someone@example.com about my contacts"`: refused before anything was sent, and the
+email is not repeated:
+
+```json
+{"error": {"code": "validation_error", "message": "Invalid input.", "fields": {"question": ["Please remove personal details (names, email addresses, phone or ID numbers, dates of birth) before asking. They are never sent to the assistant."]}, "request_id": "28282670-6182-4507-8855-34da1cccc3e9"}}
+```
+
+**Policy upload** `POST /api/llm/v1/policies/` (**admins only**: admin session + CSRF, 20 per minute). Sign in at
+`/api/admin/login/` in the same way, then send one file in the `file` field:
+
+```bash
+curl -s -b admin-jar.txt -H "X-CSRFToken: $CSRF" -F "file=@my-fictional-policy.md" http://127.0.0.1:8000/api/llm/v1/policies/
+```
+
+**201** (a throwaway fictional file, uploaded once to record this response and then deleted):
+
+```json
+{"id": 11, "title": "Readme example", "filename": "week4-readme-example.md", "sha256": "6de2424e859cc7be3efe6249bcf6ebc44b766d5575e3909d5870db614f3bb545", "size_bytes": 188, "chunks": 1, "embedding_model": "ollama:nomic-embed-text", "chunk_size": 600, "chunk_overlap": 100}
+```
+
+**400** for a `.pdf`:
+
+```json
+{"error": {"code": "validation_error", "message": "Invalid input.", "fields": {"file": ["Only .txt and .md files can be uploaded."]}, "request_id": "ed650f35-0f1c-45e3-af33-9ef8cd344867"}}
+```
+
+| Endpoint | Status codes |
+|---|---|
+| workbench, clusters | 200; 401 not signed in as a member (an admin session too); 405 for anything but GET; 429; 503 `report_unavailable` if the committed file cannot be read |
+| ask | 200 (`answered`, `insufficient_information` or `out_of_scope`); 400 invalid input, unknown field or personal details; 401; 403 missing CSRF; 429 more than 10 a minute; 502 `llm_bad_reply`; 503 `llm_unavailable`; 504 `llm_timeout` |
+| policy upload | 201; 400 wrong type, too big, not UTF-8, binary, empty, personal details or unknown field; 403 not an admin or missing CSRF; 409 `duplicate_document`; 429; 503 / 504 embedder down or too slow (nothing stored) |
+
+### Safety design (Week 4)
+
+| Rule | How it is enforced |
+|---|---|
+| **No patient data reaches the model** | Profile data is never read by the LLM code (a test checks the prompt). Questions with an email address, 7 or more digits or the member's own name are refused with 400 **before** retrieval or any model call; uploads with personal details are refused the same way. Refused, not stripped: cutting part of a question changes what was asked, and what is left can still identify someone |
+| **Local model only** | The provider sends requests only to `localhost`, `127.0.0.1` or `::1` (checked before anything is sent) and ignores proxy settings, so a question cannot leave the computer. No API key exists, so none can leak |
+| **Retrieved documents are untrusted** | Chunks go in the user message inside `<document id>` tags, never in the system prompt; the prompt says they are reference text, not instructions; a fake `</document>` inside a chunk is defused. Tested with an injected policy, and once for real (the model ignored it) |
+| **Answers must be backed by the documents** | Strict reply schema; every citation verified against what was sent; boilerplate quotes removed; no verified citation means `insufficient_information`, never a guess; an answer that repeats the system prompt is dropped |
+| **Upload is admin-only and validated** | Admin session + CSRF (the same rules as every admin route; there is still no public admin signup). `.txt` / `.md` as the last extension only, at most 200 KB (refused before reading), valid UTF-8, no NUL bytes, not empty, no personal details; the browser's content type is ignored; document and chunks saved in one transaction |
+| **Limits** | Throttles: ask 10 per minute per member, upload 20, reports 60. Timeouts: chat 100 s, embeddings 60 s. Reply at most 300 tokens, context 2,048 tokens |
+| **Safe errors** | The usual `{"error": {"code", "message", "fields"}}` shape with fixed messages: no stack traces, no raw model text, no question or file content. Logs hold the error type only; questions and answers are never stored or logged |
+| **The members' rules still hold** | Every new view declares its authentication and permission classes; no member route takes an id; no `role`, `status`, `is_staff` or `is_superuser` is read from a body |
+
+### Limitations (Week 4)
+
+- **A small local model.** `llama3.2:3b` runs on the CPU. It sometimes quotes the wrong sentence or picks the wrong
+  status even when the right passage was sent (case A3 in the evaluation).
+- **Slow answers: about 30 to 76 seconds** for a real question on this laptop (the first call also loads the model;
+  measured cold 36 to 76 s, warm 16 to 27 s). The page shows a "Thinking… N s" timer, the backend waits up to 100 s,
+  and the Next.js proxy was raised to 120 s for this (see the evidence file). With both models loaded Ollama uses about
+  2.6 GB of memory (3.3 GB peak during the evaluation), and by Ollama's default the models stay loaded for 5 minutes
+  after the last question.
+- **Weak cluster structure.** The best silhouette is **0.26** at k = 2 (k = 3 is almost tied at 0.256), K-Means and
+  Ward agree only partly (adjusted Rand 0.594), and the 2D view keeps 58% of the spread. The clusters are exploratory
+  and say nothing about who anyone is.
+- **A small evaluation.** **12 cases, one run.** Prompt A got 11 of 12 right and prompt B 9 of 12, so there were **4
+  failures** in 24 runs (1 for A, 3 for B), all on answerable questions. That is not enough to say one prompt is
+  better, and results can change between runs.
+- **A strict citation check.** A quote must match the passage (ignoring case, spacing and Markdown marks). One correct
+  answer was refused because the model dropped two words from its quote. This is on purpose: a looser check would let
+  invented quotes through.
+- **A fixed similarity threshold of 0.62 with a narrow gap.** Covered probe questions scored 0.633 to 0.770 and
+  uncovered ones 0.423 to 0.607, from only 14 probes. A new question can land on the wrong side. Most out-of-scope
+  questions never reach the model because of it, so `out_of_scope` is rare.
+- **A verified quote does not prove the whole answer**; the answer can still add words beyond the quote.
+- **Synthetic data and fictional policies only. Not medical advice**, not a diagnosis, not a decision about any real
+  person.
+- **Cost is 0.00 because the model is local**: no per-token charge. Hardware and electricity are not counted, and
+  embedding calls are not included in the token counts.
+- **The workbench reused the test pile** from Week 3, so every choice uses validation only (see "Limitations" at the
+  end). The workbench ships no model.
+- **No upload audit event and no document list.** An audit action would need a migration in the frozen `audit` app;
+  the document stores `uploaded_by` instead. With the fake embedder, almost every question gets
+  `insufficient_information`, because the 0.62 threshold was set for `nomic-embed-text`.
+
 ## What is new in Week 3
 
 Week 3 ("Machine Learning Pipeline and Prediction API") adds an **educational demo**: a model that estimates the
@@ -156,7 +513,7 @@ python -m ml.experiment                                         # rebuild the mo
 python -m ml.train --check                                      # rebuild the model in memory and compare; writes nothing
 python -m ml.train                                              # write the model files (then review EXPECTED_SHA256)
 
-python -m pytest                    # 429 passed (278 Week 1–2 + 151 Week 3), about 2–4 minutes
+python -m pytest                    # 429 passed at the end of Week 3 (278 Week 1–2 + 151 Week 3); see "Tests" for today's count and time
 ML_SKIP_SLOW=1 python -m pytest     # skips the 7 slow retraining tests locally (they run by default)
 ```
 
@@ -710,7 +1067,8 @@ Real secrets live only in `backend/.env`, which is **git-ignored** and never com
 
 ```bash
 cd backend
-python -m pytest        # 429 passed (278 Week 1–2 + 151 Week 3; the Week 3 test files are listed under "What is new in Week 3")
+python -m pytest        # 658 passed (278 Week 1–2 + 151 Week 3 + 229 Week 4), about 4 to 7 minutes on this laptop (final run: 7 min 12 s; other Week 4 runs 3 min 23 s to 6 min 26 s);
+                        # the Week 3 and Week 4 test files are listed under "What is new in Week 3" / "Week 4"
 ```
 
 | File | What it proves |
@@ -730,7 +1088,7 @@ python -m pytest        # 429 passed (278 Week 1–2 + 151 Week 3; the Week 3 te
 
 ```bash
 cd frontend
-npm test                # 47 passed (Vitest + Testing Library, jsdom); 23 of them are the Week 3 card tests
+npm test                # 80 passed (Vitest + Testing Library, jsdom); 23 are the Week 3 card tests, 33 the Week 4 /ml tests
 ```
 
 | File | What it proves |
@@ -938,6 +1296,22 @@ Week 1 example (still valid): `POST /api/auth/user/login/` with `{ "email": "mom
 | ![Quick check, dark](docs/screenshots/week3/card-dark.png) | |
 | The same quick check in dark mode | |
 
+### Week 4
+
+Captured on 10 November 2026 with headless Chrome at 2x scale, against the real local model (`llama3.2:3b` +
+`nomic-embed-text`), using throwaway fictional accounts that were deleted afterwards.
+
+| | |
+|---|---|
+| ![Supervised tab](docs/screenshots/week4/supervised.png) | ![Clusters tab](docs/screenshots/week4/clusters.png) |
+| `supervised.png`: the Supervised tab: versions, the four models on validation, the choice and why, the confusion matrix at 0.22, importance, the overfitting gap, the mistakes, and the test pile shown once | `clusters.png`: the Clusters tab, labelled exploratory: elbow and silhouette, k = 2 with the weak-structure note, the 500-point PCA view (circles and squares), the descriptions and the agreement |
+| ![FAQ answered](docs/screenshots/week4/faq-answered.png) | ![FAQ insufficient](docs/screenshots/week4/faq-insufficient.png) |
+| `faq-answered.png`: a real answer with its verified citation from the *Emergency contacts* policy, 706 + 54 tokens, cost 0.00, `llama3.2:3b (ollama)`, 73.8 s (cold) | `faq-insufficient.png`: "What is the capital of France?" gives the fixed insufficient-information answer; the model was not called |
+| ![FAQ refused](docs/screenshots/week4/faq-refused-email.png) | ![Admin upload refuses a pdf](docs/screenshots/week4/admin-upload-refused-pdf.png) |
+| `faq-refused-email.png`: a question with an email address is refused before anything is sent | `admin-upload-refused-pdf.png`: an admin's upload panel refuses a `.pdf` ("Only .txt or .md files can be uploaded.") |
+| ![Swagger](docs/screenshots/week4/swagger-week4.png) | |
+| `swagger-week4.png`: Swagger with the new *llm faq (educational)* group and the two Week 4 report endpoints | |
+
 ## Review response (PR #3)
 
 Mentor review of PR #3 at `9784e4d`. Each code point was fixed in its own commit on this branch, with tests that fail
@@ -976,6 +1350,8 @@ control, a manual security review and a bug story: see [docs/ai-workflow.md](doc
 The rules the AI must follow in this repo are in [CLAUDE.md](CLAUDE.md).
 Week 3 has its own section there ("Week 3: Machine Learning Pipeline and Prediction API"): every prompt I sent, which
 ones were drafted with help from Claude in a separate chat, my decisions, and what the checks caught.
+Week 4 has its own section too ("Week 4: Comparative ML Workbench, Clustering, LLM Endpoint and FAQ Assistant"),
+starting with a short summary.
 
 ## Demo video
 

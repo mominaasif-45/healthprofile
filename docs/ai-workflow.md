@@ -906,6 +906,46 @@ endpoint and an educational FAQ assistant over approved fictional clinic policie
 It is planned in a separate git worktree on `feature/week4-ml-llm-rag`, started from the `feature/week3-ml-pipeline`
 head (PR #4 still under review), with its own database `healthprofile_week4`.
 
+### Week 4 summary
+
+**What the AI was asked to do.** Claude Code built Week 4 in seven phases, each one tests first, then the code, then
+three deliberate "break-it" checks and the full Week 1 to 3 regression list, then a report to me, and a commit only
+after my approval: (1) the supervised workbench, (2) exploratory clusters, (3) the LLM endpoint with a local Ollama
+model behind a `fake` / `ollama` adapter, (4) RAG over fictional policies with verified citations, (5) a 12-case
+evaluation of two system prompts, (6) the `/ml` dashboard, and (7) the README, evidence, screenshots and the PR
+description. It never read `.env`, never pushed, and asked before touching any file outside the phase.
+
+**Three (and more) refinements where my plan or review changed the result.**
+
+1. **Refuse personal data instead of stripping it.** My setup answer said to reject questions that contain a phone
+   number or email. The AI's design kept that rule and explained it: cutting part of a question changes what was
+   asked, and what is left can still identify someone. The same rule now applies to uploaded policies, because their
+   text is also sent to the model.
+2. **The policy facts were checked against the code (prompt 10).** Before Phase 5 I asked for every factual sentence
+   in the five policies to be checked against the real code, tests and reports. Five sentences were imprecise (none
+   false): the demographics and wellness fields, "secure" cookies (HttpOnly always, Secure only when `DEBUG=False`),
+   which dates of birth are refused, and "about half" (now "95 of 187 no-shows, 50.8%"). They were fixed before the
+   evaluation, so the assistant would not repeat them.
+3. **Expectations saved before the run (prompt 11).** I required the 12 cases and their expected outcomes to be saved
+   before any real model call and never changed afterwards. The file was hashed first (`71147923…`), and the four
+   failures are reported as they happened instead of being designed away.
+4. **Boilerplate quotes removed, and the strict check kept.** In the first real Phase 4 run the model "cited" the
+   disclaimer line that every policy starts with. It passed the check (it really is in the chunk) but proved nothing,
+   so a quote found in two or more documents is now removed. When the evaluation showed the check refusing a correct
+   answer over two dropped words, I decided to keep it strict.
+5. **The proxy timeout.** The real browser run (not the unit tests) found that Next.js drops forwarded requests after
+   30 s, so most real answers came back as "Something went wrong." The fix touched a Week 1 file, so it waited for my
+   go and went in as its own commit.
+
+**What I checked myself.** I read and approved the five policy texts and the fact-check table, read the evaluation's
+failures and the saved answers, decided on every "changes beyond the brief", set up my own `.env` (the AI only gave me
+the setting names), restored `.env.example`, and checked the `/ml` page by hand after the proxy fix.
+
+**What I would do differently.** Run one real browser test at the end of Phase 3, not Phase 6: the 30 s proxy limit
+would have shown up as soon as the first slow answer went through the frontend. Plan the evaluation with more than 12
+cases and at least two runs, so the comparison of prompts can say something. And add CI jobs for the full backend and
+frontend test suites earlier; today CI runs only the race tests.
+
 ### Who did what
 
 - **My prompts and my phase decisions** (each marked below) were drafted with help from Claude in a separate chat.
@@ -1101,5 +1141,32 @@ Commit in this order, do not push:
 Before committing, run `npm run lint` and `npm run build` once to confirm the config change is valid, and show the result. Log this message as the next prompt in docs/ai-workflow.md with the mark "drafted with help from Claude in a separate chat" (include it in the Phase 6 commit).
 
 Then stop and tell me when both commits are done, with `git --no-pager log --oneline -5`. Do not start anything else. I am going to check the page by hand. Never read, print or share .env.
+```
+</details>
+
+<details><summary>14. Phase 7: README, screenshots, evidence, PR description, CI check (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Phase 7: the final step. Do it in one go. Do not wait for another "go", but do NOT push and do NOT open a PR yet.
+
+Context: Phases 1 to 6 are committed (HEAD 55d2832). I fixed my local .env myself and restored backend/.env.example, so git status should be clean; check it and tell me if it is not. My servers are stopped.
+
+1. README: add a "Week 4" section to the README (keep Weeks 1 to 3 intact). It must cover: what was built (supervised workbench, clusters, LLM endpoint, RAG over fictional policies, the /ml dashboard, evaluation); how to run it (backend, frontend, seed_policies, how to switch from fake to ollama in my own .env, the Ollama models needed); API examples for the workbench, clusters, ask, and policy upload endpoints (curl or Swagger examples with the real response shapes, no secrets); the architecture in a short diagram or list (question → privacy check → retrieval → untrusted-document prompt → model → schema check → citation verification → answer); the safety design (no patient data to the model, local-only model, retrieved documents untrusted, admin-only upload and validation, throttle, timeouts, safe errors); the honest limitations (small local 3B model, 30 to 76 s answers, weak cluster structure with silhouette 0.26, the evaluation's 12 cases and 4 failures, strict citation check, synthetic data only, not medical advice, the fixed 0.62 threshold with a narrow gap, cost is 0 because it is local). Fix the stale statement about how long the test suite takes: measure it and write the real figure (it is about 4 to 6 minutes).
+2. Screenshots: with your own headless browser (Playwright, in the scratchpad only, no new project packages), take clear screenshots at 2x device scale into docs/screenshots/week4/: the Supervised tab, the Clusters tab, the FAQ tab with a real answered question and its citation, the FAQ tab refusing an email address, the FAQ tab with an insufficient-information answer, the admin upload panel refusing a .pdf, and the Swagger page showing the new endpoints. Use throwaway fictional users and delete them afterwards. Use the real Ollama model. Do not read or print .env. Close the ports when finished. Tell me every file name.
+3. Evidence: write docs/evidence/week4.md with: the regression evidence for Weeks 1 to 3 (backend test count, the 9 race tests with the "ran 9, skipped 0" guard, the ml.train --check SHA d69f7723…8218 match, frozen files with no diff against feature/week3-ml-pipeline, lint, vitest count, build page count, spectacular validation), and the Week 4 checks (tests added per phase with the failing-first evidence you recorded, the break-it checks per phase, the real timings and peak memory, the evaluation hash 71147923…, the proxy-timeout bug found in the real browser run and how it was fixed). Include a "what I could not verify" list. Run the FINAL validation now on the final tree and put the exact numbers in, with the tested commit hash. Name that tested commit.
+4. docs/ai-workflow.md: add a short Week 4 summary at the top of the Week 4 section: what the AI was asked to do, three refinements where my plan or review changed the result (for example: refuse instead of strip personal data, boilerplate-quote removal, proxy timeout, the five policy sentences found imprecise, the original rule that expectations are saved before the run), what I checked myself, and what I would do differently. Log this message as the next prompt with the mark "drafted with help from Claude in a separate chat".
+5. Draft, but do not post, a PR description for a stacked PR with base feature/week3-ml-pipeline and head feature/week4-ml-llm-rag, in docs/evidence/week4-pr-description.md: summary, what changed per phase, how to run, test evidence with the tested commit, security notes, limitations, and the list of files outside Week 4 that changed (the one-line next.config.ts, the one-line profile menu link). Do not add any "Co-Authored-By" line there; I will paste it myself.
+6. Check CI: read .github/workflows/ci.yml and tell me if the new Week 4 backend and frontend tests will run in CI with the fake provider and no Ollama, and whether anything needs a change. Do not change it unless a test would fail or be skipped; if a change is needed, explain it and wait.
+7. Commit in two commits: docs and screenshots ("docs: Week 4 README, evidence, screenshots and PR description") and nothing else. Do not push. If you needed to change any code file, stop and tell me instead.
+8. Report: what changed, the final validation table, the tested commit, the list of screenshots, a list of any claim in the README or evidence you could not verify, and the exact git commands for me to push and open the PR (do not run them). Also tell me the total number of tests, the number of files changed in Week 4 versus feature/week3-ml-pipeline (git diff --stat summary), and the final git log.
+
+Never read, print or share .env or any password. Report the same way: what passed, what you were unsure about, what I should check with my own eyes.
+```
+</details>
+
+<details><summary>15. Small evidence fix, amend the docs commit (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Small docs fix, then stop. In docs/evidence/week4.md: (1) in the "What I could not verify" list, replace the line about my hand check with: "Momina checked the /ml page by hand on 10 Nov 2026 (about 00:46 to 01:15): the three tabs, arrow keys, disclaimers and the three FAQ questions all behaved as expected after she fixed her own .env to use Ollama; the first attempt showed 'insufficient information' because the backend was still on the fake provider." (2) make the Phase 1 failing-first line say plainly that the recorded count was 25 and the final file has 29 tests, so the original count is unverified. Change nothing else. Amend the docs commit b69ba6f (nothing is pushed), keep the same message, and show me `git --no-pager log --oneline -3`. Do not push. Log this message as the next prompt in docs/ai-workflow.md with the mark "drafted with help from Claude in a separate chat", inside the amended commit. Never read or print .env.
 ```
 </details>
