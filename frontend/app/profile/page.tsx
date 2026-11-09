@@ -141,6 +141,7 @@ export default function ProfilePage() {
         { href: "#wellness", label: "Wellness goals", icon: <IconTarget /> },
         { href: "#no-show-demo", label: "No-show demo", icon: <IconPulse /> },
         { href: "/activity", label: "My activity", icon: <IconClock /> },
+        { href: "/ml", label: "ML dashboard", icon: <IconPulse /> },
         { href: "#privacy", label: "Privacy and security", icon: <IconShield /> },
       ]}
       box={

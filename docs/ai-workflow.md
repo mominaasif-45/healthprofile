@@ -1064,3 +1064,42 @@ Then build Phase 5 (LLM evaluation) as one step. Do not wait for another "go". R
 Never read, print or share .env or any password. Report the same way: what passed, what you were unsure about, what I should check with my own eyes.
 ```
 </details>
+
+<details><summary>12. Phase 5 commit, then Phase 6 (the dashboard) in one step (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Approved. Commit Phase 5 now with this exact message: "feat(llm): Week 4 LLM evaluation (12 fixed cases, prompt A vs one-line variant B, threshold re-check, automatic scoring)". Do not push. Keep the citation check strict; do not loosen it.
+
+Then build Phase 6 (the dashboard) as one step. Do not wait for a separate "go". Rules:
+
+1. Look at how the existing frontend is built first (lib/api.ts, how CSRF and auth are handled, existing components, styling, vitest setup) and follow those patterns. Do not add new npm packages unless truly necessary. Draw charts with plain inline SVG, with text labels so they do not rely on colour alone.
+2. New page `/ml` (frontend/app/ml/page.tsx) with THREE tabs: "Supervised", "Clusters", "FAQ assistant". Signed-in members only (redirect or message when not signed in, same as other pages). Add a link to it from the existing navigation or dashboard with a minimal edit. Keyboard-accessible tabs with proper roles.
+3. Supervised tab, from GET /api/ml/v1/workbench/: the model version, the data/seed/report version, the table of models (baseline, Logistic Regression, Random Forest, gradient boosting) with validation metrics and cross-validation, which model was chosen and why (validation only), the confusion matrix with the 0.22 decision line, permutation importance, the overfitting gap, and the false-positive / false-negative inspection. Show the test result once, clearly labelled as used once.
+4. Clusters tab, from GET /api/ml/v1/clusters/: version, the elbow and silhouette values, k chosen and the honest "weak structure" message, the 2D PCA scatter (500 points) with the share of variance kept, the cluster descriptions, the agreement between the two methods. The label must say "exploratory". Never use the words "risk group".
+5. FAQ assistant tab, with POST /api/llm/v1/faq/ask/: a question box (3 to 500 characters, with a character counter), a submit button, and a CLEAR "thinking" state because real answers take 30 to 50 seconds (show elapsed seconds, disable the button, no double submit). Show the status, the answer, the citations (policy file and the quoted sentence), the tokens used and the cost with the note that it is a local model and cost is 0.00. Handle every error safely with a friendly message: 400 personal details refused, 429 throttled (say to wait), 502, 503, 504 timeout, network error. Never show raw server text. For admins only, add a simple policy upload (POST /api/llm/v1/policies/, .txt or .md, 200 KB) with the server's error messages shown clearly. Hide it from non-admins.
+6. Disclaimers on every tab: synthetic data only, educational demo, not medical advice, the model and its version, and on the FAQ tab that answers come only from the listed documents and can be wrong.
+7. Tests first (vitest, shown failing, then passing): the tabs render and switch with the keyboard; each tab shows its versions, metrics and disclaimers from mocked API responses; the FAQ tab shows the thinking state, prevents double submit, shows citations, and maps each error code to the right safe message; non-admins do not see the upload; the banned words never appear. Frontend tests for Weeks 1 to 3 must stay unchanged and passing (47 before, so 47 plus the new ones).
+8. Do three deliberate break-it checks (for example: remove the double-submit guard, show the raw error text, show the upload to non-admins) and show which test catches each one. Restore the files byte-for-byte.
+9. Full regression list as before: backend pytest (none skipped), the 9 race tests, makemigrations --check, ml.train --check SHA, frozen Week 1 to 3 files no diff, spectacular validation, lint, vitest, and `npm run build` (the route table should now include /ml; report the exact page count). Include timing and peak memory.
+10. Run the page for real if you can: start the backend and frontend on the Week 4 database, and with the browser tools you have (Playwright is acceptable) load /ml, switch the tabs, and report what you saw. Do not read or print .env. If you need LLM_PROVIDER=ollama in my .env for a real FAQ call, do NOT edit it. Give me the exact steps to do it myself.
+11. Do NOT commit Phase 6. Do NOT push. Report first.
+12. Log this message as the next prompt in docs/ai-workflow.md with the mark "drafted with help from Claude in a separate chat".
+
+Report the same way: what passed, what you were unsure about, and what I should check with my own eyes, with exact steps for me to open the page.
+```
+</details>
+
+<details><summary>13. Proxy timeout fix, then the Phase 6 commit (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Go. Apply the proxy timeout fix: add `experimental: { proxyTimeout: 120_000 }` to frontend/next.config.ts with a short comment explaining why (Next.js drops forwarded requests after 30 s; real model answers take 30 to 76 s; the backend timeout is 100 s). Change nothing else in that file.
+
+Commit in this order, do not push:
+1. The proxy fix alone, with this message: "fix(frontend): raise the Next.js proxy timeout to 120 s so slow local-model answers are not cut off at 30 s"
+2. Phase 6 with this message: "feat(frontend): Week 4 ML dashboard (/ml: supervised, clusters, FAQ assistant; admin policy upload)"
+
+Before committing, run `npm run lint` and `npm run build` once to confirm the config change is valid, and show the result. Log this message as the next prompt in docs/ai-workflow.md with the mark "drafted with help from Claude in a separate chat" (include it in the Phase 6 commit).
+
+Then stop and tell me when both commits are done, with `git --no-pager log --oneline -5`. Do not start anything else. I am going to check the page by hand. Never read, print or share .env.
+```
+</details>
