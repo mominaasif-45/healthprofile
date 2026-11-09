@@ -1011,3 +1011,8 @@ Week 3: https://www.loom.com/share/9d6433ae55664ab89026f9e7df4299b4
   never medical advice.
 * **Week 3 ML demo**: synthetic data only, one split and one seed, a pickle model file protected by a checksum, and
   the model fitted on training rows only. See "Limitations and future work (Week 3)" above.
+* **Week 4 workbench: the test pile was reused.** The test pile was already used in Week 3 to report the
+  baseline, logistic regression and gradient boosting, so it is no longer completely unseen. In Week 4 every model
+  comparison and every choice is made on the validation pile only; the test numbers (including random forest's)
+  are reported afterwards and are not used to choose. The workbench ships no model: the API still uses
+  `noshow-1.0.0`. See [docs/ml/workbench-report.md](docs/ml/workbench-report.md).

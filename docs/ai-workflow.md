@@ -898,3 +898,67 @@ Next time, I would try training the model without the age band feature to see ho
 I still find it a little confusing how to choose the best threshold and balance precision and recall. In my project, the model had 29.5% precision and 50.8% recall at a threshold of 0.22. I learned that lowering the threshold catches more missed appointments but can also create more wrong predictions. I also want to understand better how to decide which ML model is best for a problem.
 
 
+
+## Week 4: Comparative ML Workbench, Clustering, LLM Endpoint and FAQ Assistant
+
+Week 4 extends the Week 3 ML system into a comparative workbench (supervised and unsupervised), adds an LLM backend
+endpoint and an educational FAQ assistant over approved fictional clinic policies, and shows all three in a dashboard.
+It is planned in a separate git worktree on `feature/week4-ml-llm-rag`, started from the `feature/week3-ml-pipeline`
+head (PR #4 still under review), with its own database `healthprofile_week4`.
+
+### Who did what
+
+- **My prompts and my phase decisions** (each marked below) were drafted with help from Claude in a separate chat.
+  They are not written by me alone. I make the decisions in them and approve every phase with "go".
+- **Claude Code** works in the repository: it reads the code, writes each plan, writes the tests first, implements and
+  runs the checks. It does not read `.env`, merge or push.
+
+### Prompt history (as sent in the session)
+
+<details><summary>1. Week 4 planning request (drafted with help from Claude in a separate chat)</summary>
+
+```text
+New task: Week 4. The brief (Elevate Engine Weeks 4 to 6, Week 4 section) asks to: extend the Week 3 ML system into a comparative workbench (Logistic Regression, Random Forest and one gradient boosting model or SVM; confusion matrix, precision, recall, F1, ROC-AUC, PR-AUC, train versus validation, stratified cross-validation, one tuned model with GridSearchCV or RandomizedSearchCV, permutation importance, false positive and negative inspection, reproducible preprocessing pipeline); unsupervised learning (K-Means plus DBSCAN or Agglomerative on non-sensitive engagement features, silhouette and elbow, PCA 2D plot, explanation that clusters are exploratory); an LLM backend endpoint (system prompt, task prompt, context window strategy, token limit, temperature, JSON response schema); an educational FAQ assistant over approved fictional clinic policies (upload, text extraction, chunking, embeddings, vector search, cited passages, explicit ‘insufficient information’); a dashboard with three tabs (supervised, clusters, LLM Q&A) showing model versions, metrics and disclaimers; 12 LLM evaluation prompts (answerable, ambiguous, out-of-scope, prompt-injection) comparing two prompts or retrieval settings. Constraints: train-only fitting, pinned dependencies and seeds, no patient-identifiable data to external LLMs, validate upload types and sizes, enforce upload permissions, treat retrieved documents as untrusted, rate limits, timeouts, safe errors, approximate token and cost reporting, never present output as diagnosis; keep Weeks 1 to 3 working with regression evidence.
+
+Plan only. Change nothing and do not read or print .env. Please propose:
+
+A new git worktree and branch feature/week4-ml-llm-rag from the current feature/week3-ml-pipeline head, in C:\Users\Momina\Projects\healthprofile-week4, with its own database healthprofile_week4 (owner healthprofile_user, like Week 3), its own venv on Python 3.13, its own .env made by copying values without printing them, and its own admin account. Say how the stacked PR will work (base feature/week3-ml-pipeline) and how this avoids touching PR #3 and PR #4.
+Which parts of the Week 3 ML package we reuse, and what new files each phase adds.
+For the LLM and RAG: options for the LLM provider (hosted API or local), embeddings, and vector storage, with the privacy, cost, install size and testability of each, and your recommendation. Use a fake LLM and fake embeddings in tests so no network is needed. Explain how the API key will be kept out of git, logs and screenshots.
+The phases (supervised, unsupervised, LLM endpoint, RAG, 12-prompt evaluation, dashboard, README and evidence), with what each must prove, and what we should cut or simplify to finish by Tuesday 11:59 PM PKT, ordered by the acceptance checks.
+The regression evidence plan for Weeks 1 to 3.
+What I should decide myself.
+
+Start a Week 4 section in docs/ai-workflow.md and log this message as prompt 1, marked ‘drafted with help from Claude in a separate chat’. Don’t commit and don’t push.
+```
+</details>
+
+<details><summary>3. Setup go, with my answers to the planning questions (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Go for setup, with these answers. (1) Tuesday 10 Nov, 11:59 PM PKT: apply every cut. (2) Provider: LOCAL Ollama for the chat model and for embeddings (nomic-embed-text), no key, LLM_PROVIDER=fake|ollama using Python’s built-in urllib. Measure the real response time on my laptop and set a realistic timeout (the first call loads the model) with a clear loading state in the UI. Cost shows as 0.00 (local) with real token counts. (3) No new packages at all (no anthropic, no pypdf). (4) One commit per phase after I approve. (5) The edits outside the new app in your list are approved. (6) Reject questions that contain a phone number or email. (7) Admins upload, members ask. (8) Keep noshow-1.0.0. (9) Compare two system prompts. (10) You draft 3 or 4 fictional policies and I review and approve them. (11) Do NOT commit anything on the week3 branch. Move the Week 4 section of docs/ai-workflow.md into the new worktree and leave prompt 35 uncommitted in week3. Phase order: 1, 2 (minimal), 3, 4, 5, 6, 7.
+
+Now: create the worktree and branch, and do the setup in your section 1. Run what you can. For anything that needs my password or my hands (psql password, the .env copy), stop and give me the exact lines to type, one at a time, saying which terminal and folder. Never read or print .env. After the setup works, record the baseline test counts, then show me the Phase 1 plan only and wait for my ‘go’. Log this message as prompt 3, marked ‘drafted with help from Claude in a separate chat’. Don’t commit and don’t push.
+```
+</details>
+
+<details><summary>4. Setup done on my side, Ollama installed (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Done: I ran the psql line (CREATE DATABASE) and the two .env lines. Also, Ollama is installed (0.40.15) with nomic-embed-text and llama3.2:3b pulled, and the test run worked. My laptop has 15.9 GB RAM and about 13 GB is usually in use while Chrome and VS Code are open, so keep memory use in mind. Please continue: check the database name without showing any secret, run migrate, give me the exact create_admin line, record the baseline counts, and then show me the Phase 1 plan only. Log this message as the next prompt, marked ‘drafted with help from Claude in a separate chat’. Don’t commit and don’t push.
+```
+</details>
+
+<details><summary>5. Phase 1 go, with three additions (drafted with help from Claude in a separate chat)</summary>
+
+```text
+I created the admin. Go for Phase 1 as planned, with three additions. (a) The baseline lists the build as ‘10 pages’, but Week 3 showed ‘Generating static pages (11/11)’: please explain or correct it. (b) The test pile was already used in Week 3 for the baseline, logistic regression and gradient boosting. In Week 4 the model comparison and any choice must be made on validation only, and the test numbers (including random forest) are reported afterwards, not used to choose. Say this plainly in the workbench report and in the README limitations. (c) Keep memory low (n_jobs=1) and report peak memory. Tests first, shown failing and then passing, then the three break-it checks, then the full validation list, with real outputs. Don’t commit until I approve. Don’t push. Log this message as the next prompt, marked ‘drafted with help from Claude in a separate chat’.
+```
+</details>
+
+<details><summary>6. Phase 1 approved, Phase 2 plan request (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Approved. Commit Phase 1 as proposed. Log this message as prompt 6, marked ‘drafted with help from Claude in a separate chat’, and include it in the same commit. Then show me git log --oneline -3 and git status. Then show me the Phase 2 plan only (the minimal clusters version): engagement features only (no age band, distance band, or the no-show label), scaler, PCA and K-Means fitted on the training rows only, elbow (k=2 to 8) and silhouette, Agglomerative at the chosen k compared with K-Means, 2D PCA points for the plot, a cluster summary with plain-words descriptions that never call clusters patient types or risk groups, a section saying why clusters are exploratory, a read-only member endpoint like the workbench one, tests first, break-it checks, and the regression checks. Keep it as small as it can be and still meet the brief. Don’t push.
+```
+</details>

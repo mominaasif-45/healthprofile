@@ -6,8 +6,16 @@ POST /api/ml/v1/no-show/predict/: the educational no-show likelihood demo.
 * Throttled per member (scope "ml_predict", 30/min in settings).
 * Order: sign-in, CSRF, throttle -> load the verified model (503) -> validate (400) -> predict (200).
 * Nothing is stored, audited or logged: the inputs are fictional and nothing changes.
+
+GET /api/ml/v1/workbench/: the committed Week 4 comparison report (read-only, members only, throttled).
 """
+import json
+import logging
+
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
+from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -15,11 +23,13 @@ from rest_framework.views import APIView
 
 from accounts.authentication import CookieJWTAuthentication
 
+from . import workbench
 from .artifact import NOTICE
 from .predictor import get_predictor
 from .serializers import NoShowRequestDocs, NoShowResponse
 
 TAG = ["ml demo (educational)"]
+logger = logging.getLogger(__name__)
 
 # Real outputs of noshow-1.0.0 (a test sends each request and checks the response is exactly this).
 EXAMPLES = [
@@ -83,3 +93,43 @@ class NoShowPredictView(APIView):
         serializer = predictor.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         return Response(predictor.predict(serializer.validated_data))
+
+
+class ReportUnavailable(APIException):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_detail = "The comparison report is unavailable right now. Please try again later."
+    default_code = "report_unavailable"
+
+
+class WorkbenchView(APIView):
+    """Serves the committed workbench JSON as it is: it takes no input and changes nothing."""
+
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "ml_reports"
+
+    @extend_schema(
+        tags=TAG,
+        summary="Week 4 supervised comparison report (educational demo)",
+        description=(
+            "**Educational comparison on synthetic data. Not medical advice and not a diagnosis.** Returns the "
+            "committed output of `python -m ml.workbench` (`version`, metrics per model, tuning, permutation "
+            "importance, mistakes and the test-pile note). It ships no model: predictions still use noshow-1.0.0."
+            "\n\nErrors: 401 not signed in as a member, 429 more than 60 requests a minute, 503 "
+            "`report_unavailable` (the report file could not be read)."
+        ),
+        responses={
+            200: OpenApiResponse(response=OpenApiTypes.OBJECT, description="The workbench report."),
+            401: OpenApiResponse(description="Not signed in as a member."),
+            429: OpenApiResponse(description="Too many requests (60 per minute per member)."),
+            503: OpenApiResponse(description="report_unavailable: the report file could not be read."),
+        },
+    )
+    def get(self, request):
+        try:
+            data = json.loads(workbench.RESULTS_PATH.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            logger.warning("Workbench report could not be read (%s)", type(exc).__name__)  # class name only
+            raise ReportUnavailable() from None
+        return Response(data)

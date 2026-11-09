@@ -1,0 +1,941 @@
+{
+  "version": "workbench-1.0.0",
+  "disclaimer": "Educational comparison on synthetic data. Not medical advice, not a diagnosis, and not a prediction about any real person or appointment. This report ships no model: the API still uses noshow-1.0.0.",
+  "test_pile_note": "The test pile was already used in Week 3 to report the baseline, logistic regression and gradient boosting, so it is no longer completely unseen. In Week 4 every comparison and every choice is made on the validation pile only. The test numbers, including the first ones for random forest, are reported afterwards and are not used to choose anything.",
+  "settings": {
+    "split_seed": 42,
+    "model_seed": 42,
+    "cv_folds": 5,
+    "rf_search_tries": 10,
+    "permutation_repeats": 10,
+    "overfit_gap": 0.05,
+    "leakage_margin": 0.03,
+    "scikit_learn": "1.9.1",
+    "shipped_model": "noshow-1.0.0"
+  },
+  "pile_sizes": {
+    "train": {
+      "rows": 4200,
+      "no_shows": 874
+    },
+    "validation": {
+      "rows": 900,
+      "no_shows": 187
+    },
+    "test": {
+      "rows": 900,
+      "no_shows": 187
+    }
+  },
+  "ceilings": {
+    "train": 0.665,
+    "validation": 0.6375,
+    "test": 0.6393
+  },
+  "models": {
+    "baseline": {
+      "tuning": {
+        "best_params": {},
+        "cv_pr_auc": null
+      },
+      "cv": {
+        "rows": 4200,
+        "roc_auc": {
+          "mean": 0.5,
+          "sd": 0.0,
+          "folds": [
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "pr_auc": {
+          "mean": 0.2081,
+          "sd": 0.0005,
+          "folds": [
+            0.2071,
+            0.2083,
+            0.2083,
+            0.2083,
+            0.2083
+          ]
+        }
+      },
+      "train": {
+        "roc_auc": 0.5,
+        "pr_auc": 0.2081,
+        "brier": 0.1648,
+        "f1": 0.3445
+      },
+      "validation": {
+        "roc_auc": 0.5,
+        "pr_auc": 0.2078,
+        "brier": 0.1646,
+        "threshold": 0.2,
+        "precision": 0.2078,
+        "recall": 1.0,
+        "f1": 0.3441,
+        "balanced_accuracy": 0.5,
+        "accuracy": 0.2078,
+        "tp": 187,
+        "fp": 713,
+        "fn": 0,
+        "tn": 0
+      },
+      "gap": {
+        "pr_auc": 0.0003,
+        "overfit": false
+      }
+    },
+    "logistic_regression": {
+      "tuning": {
+        "best_params": {
+          "C": 0.1
+        },
+        "cv_pr_auc": 0.3468
+      },
+      "cv": {
+        "rows": 4200,
+        "roc_auc": {
+          "mean": 0.646,
+          "sd": 0.0422,
+          "folds": [
+            0.6565,
+            0.574,
+            0.6889,
+            0.6838,
+            0.627
+          ]
+        },
+        "pr_auc": {
+          "mean": 0.3468,
+          "sd": 0.0437,
+          "folds": [
+            0.3221,
+            0.2833,
+            0.4137,
+            0.3675,
+            0.3472
+          ]
+        }
+      },
+      "train": {
+        "roc_auc": 0.6715,
+        "pr_auc": 0.3663,
+        "brier": 0.1534,
+        "f1": 0.4027
+      },
+      "validation": {
+        "roc_auc": 0.6269,
+        "pr_auc": 0.308,
+        "brier": 0.1595,
+        "threshold": 0.22,
+        "precision": 0.3086,
+        "recall": 0.5348,
+        "f1": 0.3914,
+        "balanced_accuracy": 0.6103,
+        "accuracy": 0.6544,
+        "tp": 100,
+        "fp": 224,
+        "fn": 87,
+        "tn": 489
+      },
+      "gap": {
+        "pr_auc": 0.0583,
+        "overfit": true
+      }
+    },
+    "random_forest": {
+      "tuning": {
+        "best_params": {
+          "n_estimators": 300,
+          "min_samples_leaf": 10,
+          "max_features": "sqrt",
+          "max_depth": 12
+        },
+        "cv_pr_auc": 0.3303
+      },
+      "cv": {
+        "rows": 4200,
+        "roc_auc": {
+          "mean": 0.6406,
+          "sd": 0.0328,
+          "folds": [
+            0.6604,
+            0.5794,
+            0.6715,
+            0.6569,
+            0.635
+          ]
+        },
+        "pr_auc": {
+          "mean": 0.3303,
+          "sd": 0.0355,
+          "folds": [
+            0.3407,
+            0.2667,
+            0.3697,
+            0.3214,
+            0.3531
+          ]
+        }
+      },
+      "train": {
+        "roc_auc": 0.8332,
+        "pr_auc": 0.5982,
+        "brier": 0.1398,
+        "f1": 0.5553
+      },
+      "validation": {
+        "roc_auc": 0.6228,
+        "pr_auc": 0.3246,
+        "brier": 0.1587,
+        "threshold": 0.25,
+        "precision": 0.3433,
+        "recall": 0.4278,
+        "f1": 0.381,
+        "balanced_accuracy": 0.6066,
+        "accuracy": 0.7111,
+        "tp": 80,
+        "fp": 153,
+        "fn": 107,
+        "tn": 560
+      },
+      "gap": {
+        "pr_auc": 0.2736,
+        "overfit": true
+      }
+    },
+    "gradient_boosting": {
+      "tuning": {
+        "best_params": {
+          "learning_rate": 0.1,
+          "max_depth": 2,
+          "max_iter": 100
+        },
+        "cv_pr_auc": 0.328
+      },
+      "cv": {
+        "rows": 4200,
+        "roc_auc": {
+          "mean": 0.6334,
+          "sd": 0.0346,
+          "folds": [
+            0.6357,
+            0.5755,
+            0.678,
+            0.656,
+            0.622
+          ]
+        },
+        "pr_auc": {
+          "mean": 0.328,
+          "sd": 0.0475,
+          "folds": [
+            0.3217,
+            0.2586,
+            0.4045,
+            0.311,
+            0.3444
+          ]
+        }
+      },
+      "train": {
+        "roc_auc": 0.7083,
+        "pr_auc": 0.4236,
+        "brier": 0.1491,
+        "f1": 0.4277
+      },
+      "validation": {
+        "roc_auc": 0.6217,
+        "pr_auc": 0.324,
+        "brier": 0.1582,
+        "threshold": 0.23,
+        "precision": 0.3151,
+        "recall": 0.492,
+        "f1": 0.3841,
+        "balanced_accuracy": 0.6057,
+        "accuracy": 0.6722,
+        "tp": 92,
+        "fp": 200,
+        "fn": 95,
+        "tn": 513
+      },
+      "gap": {
+        "pr_auc": 0.0996,
+        "overfit": true
+      }
+    }
+  },
+  "rf_search": [
+    {
+      "params": {
+        "n_estimators": 300,
+        "min_samples_leaf": 20,
+        "max_features": "sqrt",
+        "max_depth": 12
+      },
+      "cv_pr_auc_mean": 0.3281,
+      "cv_pr_auc_sd": 0.0368
+    },
+    {
+      "params": {
+        "n_estimators": 300,
+        "min_samples_leaf": 10,
+        "max_features": "sqrt",
+        "max_depth": 12
+      },
+      "cv_pr_auc_mean": 0.3303,
+      "cv_pr_auc_sd": 0.0355
+    },
+    {
+      "params": {
+        "n_estimators": 200,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "max_depth": 12
+      },
+      "cv_pr_auc_mean": 0.3191,
+      "cv_pr_auc_sd": 0.0327
+    },
+    {
+      "params": {
+        "n_estimators": 200,
+        "min_samples_leaf": 40,
+        "max_features": 0.5,
+        "max_depth": 12
+      },
+      "cv_pr_auc_mean": 0.3252,
+      "cv_pr_auc_sd": 0.033
+    },
+    {
+      "params": {
+        "n_estimators": 100,
+        "min_samples_leaf": 40,
+        "max_features": "sqrt",
+        "max_depth": 6
+      },
+      "cv_pr_auc_mean": 0.3237,
+      "cv_pr_auc_sd": 0.0358
+    },
+    {
+      "params": {
+        "n_estimators": 200,
+        "min_samples_leaf": 20,
+        "max_features": "sqrt",
+        "max_depth": 12
+      },
+      "cv_pr_auc_mean": 0.3273,
+      "cv_pr_auc_sd": 0.0364
+    },
+    {
+      "params": {
+        "n_estimators": 100,
+        "min_samples_leaf": 40,
+        "max_features": 0.5,
+        "max_depth": 8
+      },
+      "cv_pr_auc_mean": 0.322,
+      "cv_pr_auc_sd": 0.0313
+    },
+    {
+      "params": {
+        "n_estimators": 100,
+        "min_samples_leaf": 20,
+        "max_features": 0.5,
+        "max_depth": 6
+      },
+      "cv_pr_auc_mean": 0.3212,
+      "cv_pr_auc_sd": 0.0349
+    },
+    {
+      "params": {
+        "n_estimators": 100,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "max_depth": 4
+      },
+      "cv_pr_auc_mean": 0.3162,
+      "cv_pr_auc_sd": 0.0335
+    },
+    {
+      "params": {
+        "n_estimators": 200,
+        "min_samples_leaf": 40,
+        "max_features": "sqrt",
+        "max_depth": 4
+      },
+      "cv_pr_auc_mean": 0.3233,
+      "cv_pr_auc_sd": 0.0385
+    }
+  ],
+  "best_on_validation": "random_forest",
+  "importance": {
+    "logistic_regression": [
+      {
+        "feature": "lead_time_days",
+        "mean": 0.0335,
+        "sd": 0.0096
+      },
+      {
+        "feature": "reminder_sent",
+        "mean": 0.0334,
+        "sd": 0.0105
+      },
+      {
+        "feature": "prior_no_shows",
+        "mean": 0.0307,
+        "sd": 0.0113
+      },
+      {
+        "feature": "distance_band",
+        "mean": 0.0209,
+        "sd": 0.0052
+      },
+      {
+        "feature": "weekday",
+        "mean": 0.0109,
+        "sd": 0.0061
+      },
+      {
+        "feature": "hour",
+        "mean": 0.0076,
+        "sd": 0.0072
+      },
+      {
+        "feature": "prior_visits",
+        "mean": 0.0002,
+        "sd": 0.0033
+      },
+      {
+        "feature": "age_band",
+        "mean": -0.0007,
+        "sd": 0.0055
+      },
+      {
+        "feature": "visit_type",
+        "mean": -0.0074,
+        "sd": 0.0061
+      },
+      {
+        "feature": "booking_channel",
+        "mean": -0.0094,
+        "sd": 0.0039
+      }
+    ],
+    "random_forest": [
+      {
+        "feature": "reminder_sent",
+        "mean": 0.0554,
+        "sd": 0.0099
+      },
+      {
+        "feature": "lead_time_days",
+        "mean": 0.0438,
+        "sd": 0.0095
+      },
+      {
+        "feature": "prior_no_shows",
+        "mean": 0.0256,
+        "sd": 0.0086
+      },
+      {
+        "feature": "distance_band",
+        "mean": 0.0165,
+        "sd": 0.0051
+      },
+      {
+        "feature": "hour",
+        "mean": 0.0103,
+        "sd": 0.0068
+      },
+      {
+        "feature": "age_band",
+        "mean": 0.0075,
+        "sd": 0.0045
+      },
+      {
+        "feature": "weekday",
+        "mean": 0.0016,
+        "sd": 0.0087
+      },
+      {
+        "feature": "prior_visits",
+        "mean": -0.003,
+        "sd": 0.0029
+      },
+      {
+        "feature": "visit_type",
+        "mean": -0.008,
+        "sd": 0.0069
+      },
+      {
+        "feature": "booking_channel",
+        "mean": -0.0211,
+        "sd": 0.0069
+      }
+    ],
+    "gradient_boosting": [
+      {
+        "feature": "lead_time_days",
+        "mean": 0.0459,
+        "sd": 0.012
+      },
+      {
+        "feature": "reminder_sent",
+        "mean": 0.0434,
+        "sd": 0.0102
+      },
+      {
+        "feature": "prior_no_shows",
+        "mean": 0.0393,
+        "sd": 0.0148
+      },
+      {
+        "feature": "distance_band",
+        "mean": 0.019,
+        "sd": 0.0039
+      },
+      {
+        "feature": "hour",
+        "mean": 0.0149,
+        "sd": 0.0056
+      },
+      {
+        "feature": "weekday",
+        "mean": 0.0101,
+        "sd": 0.0068
+      },
+      {
+        "feature": "age_band",
+        "mean": 0.0039,
+        "sd": 0.0036
+      },
+      {
+        "feature": "prior_visits",
+        "mean": 0.0,
+        "sd": 0.0073
+      },
+      {
+        "feature": "visit_type",
+        "mean": -0.0077,
+        "sd": 0.0059
+      },
+      {
+        "feature": "booking_channel",
+        "mean": -0.0246,
+        "sd": 0.0067
+      }
+    ]
+  },
+  "errors": {
+    "model": "random_forest",
+    "threshold": 0.25,
+    "profile": [
+      {
+        "box": "caught no-shows (TP)",
+        "rows": 80,
+        "mean_predicted": 0.3081,
+        "no_reminder": 0.6125,
+        "mean_lead_time": 22.0875,
+        "any_prior_no_show": 0.4875,
+        "phone_booking": 0.4875
+      },
+      {
+        "box": "missed no-shows (FN)",
+        "rows": 107,
+        "mean_predicted": 0.1775,
+        "no_reminder": 0.215,
+        "mean_lead_time": 9.7477,
+        "any_prior_no_show": 0.2804,
+        "phone_booking": 0.3832
+      },
+      {
+        "box": "false alarms (FP)",
+        "rows": 153,
+        "mean_predicted": 0.2983,
+        "no_reminder": 0.5882,
+        "mean_lead_time": 21.098,
+        "any_prior_no_show": 0.4379,
+        "phone_booking": 0.4183
+      },
+      {
+        "box": "correctly cleared (TN)",
+        "rows": 560,
+        "mean_predicted": 0.1742,
+        "no_reminder": 0.1554,
+        "mean_lead_time": 9.2821,
+        "any_prior_no_show": 0.1929,
+        "phone_booking": 0.35
+      }
+    ],
+    "false_alarms": [
+      {
+        "appointment_id": "A04329",
+        "lead_time_days": 37,
+        "weekday": "fri",
+        "hour": 17,
+        "visit_type": "new_visit",
+        "booking_channel": "online",
+        "reminder_sent": "no",
+        "prior_visits": 4,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "18-24",
+        "no_show": 0,
+        "p": 0.4524
+      },
+      {
+        "appointment_id": "A02980",
+        "lead_time_days": 6,
+        "weekday": "fri",
+        "hour": 8,
+        "visit_type": "wellness_class",
+        "booking_channel": "online",
+        "reminder_sent": "no",
+        "prior_visits": 5,
+        "prior_no_shows": 2,
+        "distance_band": "under_5km",
+        "age_band": "45-54",
+        "no_show": 0,
+        "p": 0.412
+      },
+      {
+        "appointment_id": "A00018",
+        "lead_time_days": 79,
+        "weekday": "mon",
+        "hour": 15,
+        "visit_type": "follow_up",
+        "booking_channel": "phone",
+        "reminder_sent": "no",
+        "prior_visits": 3,
+        "prior_no_shows": 0,
+        "distance_band": "15_30km",
+        "age_band": null,
+        "no_show": 0,
+        "p": 0.4092
+      },
+      {
+        "appointment_id": "A00797",
+        "lead_time_days": 82,
+        "weekday": "mon",
+        "hour": 8,
+        "visit_type": "new_visit",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 2,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "25-34",
+        "no_show": 0,
+        "p": 0.4054
+      },
+      {
+        "appointment_id": "A04152",
+        "lead_time_days": 41,
+        "weekday": "wed",
+        "hour": 12,
+        "visit_type": "routine_checkup",
+        "booking_channel": "phone",
+        "reminder_sent": "no",
+        "prior_visits": 9,
+        "prior_no_shows": 2,
+        "distance_band": "15_30km",
+        "age_band": "65+",
+        "no_show": 0,
+        "p": 0.3978
+      },
+      {
+        "appointment_id": "A03993",
+        "lead_time_days": 63,
+        "weekday": "mon",
+        "hour": 11,
+        "visit_type": "follow_up",
+        "booking_channel": "phone",
+        "reminder_sent": "no",
+        "prior_visits": 1,
+        "prior_no_shows": 0,
+        "distance_band": "15_30km",
+        "age_band": "55-64",
+        "no_show": 0,
+        "p": 0.3965
+      },
+      {
+        "appointment_id": "A05728",
+        "lead_time_days": 46,
+        "weekday": "tue",
+        "hour": 13,
+        "visit_type": "new_visit",
+        "booking_channel": "online",
+        "reminder_sent": "no",
+        "prior_visits": 4,
+        "prior_no_shows": 0,
+        "distance_band": "5_15km",
+        "age_band": "45-54",
+        "no_show": 0,
+        "p": 0.3896
+      },
+      {
+        "appointment_id": "A03988",
+        "lead_time_days": 20,
+        "weekday": "wed",
+        "hour": 16,
+        "visit_type": "new_visit",
+        "booking_channel": "online",
+        "reminder_sent": "no",
+        "prior_visits": 4,
+        "prior_no_shows": 1,
+        "distance_band": "over_30km",
+        "age_band": "35-44",
+        "no_show": 0,
+        "p": 0.3882
+      },
+      {
+        "appointment_id": "A03012",
+        "lead_time_days": 30,
+        "weekday": "fri",
+        "hour": 15,
+        "visit_type": "new_visit",
+        "booking_channel": "phone",
+        "reminder_sent": "no",
+        "prior_visits": 4,
+        "prior_no_shows": 0,
+        "distance_band": "15_30km",
+        "age_band": "55-64",
+        "no_show": 0,
+        "p": 0.3844
+      },
+      {
+        "appointment_id": "A04899",
+        "lead_time_days": 33,
+        "weekday": "fri",
+        "hour": 11,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "no",
+        "prior_visits": 2,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "18-24",
+        "no_show": 0,
+        "p": 0.374
+      }
+    ],
+    "misses": [
+      {
+        "appointment_id": "A04020",
+        "lead_time_days": 1,
+        "weekday": "thu",
+        "hour": 13,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 2,
+        "prior_no_shows": 0,
+        "distance_band": "5_15km",
+        "age_band": "35-44",
+        "no_show": 1,
+        "p": 0.0801
+      },
+      {
+        "appointment_id": "A05096",
+        "lead_time_days": 2,
+        "weekday": "thu",
+        "hour": 13,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 4,
+        "prior_no_shows": 1,
+        "distance_band": "15_30km",
+        "age_band": "35-44",
+        "no_show": 1,
+        "p": 0.0927
+      },
+      {
+        "appointment_id": "A03634",
+        "lead_time_days": 2,
+        "weekday": "wed",
+        "hour": 13,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 5,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "35-44",
+        "no_show": 1,
+        "p": 0.0943
+      },
+      {
+        "appointment_id": "A00674",
+        "lead_time_days": 10,
+        "weekday": "thu",
+        "hour": 12,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 6,
+        "prior_no_shows": 1,
+        "distance_band": "5_15km",
+        "age_band": "25-34",
+        "no_show": 1,
+        "p": 0.1029
+      },
+      {
+        "appointment_id": "A05696",
+        "lead_time_days": 7,
+        "weekday": "tue",
+        "hour": 13,
+        "visit_type": "routine_checkup",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 6,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "55-64",
+        "no_show": 1,
+        "p": 0.1068
+      },
+      {
+        "appointment_id": "A02105",
+        "lead_time_days": 4,
+        "weekday": "thu",
+        "hour": 13,
+        "visit_type": "wellness_class",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 1,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "18-24",
+        "no_show": 1,
+        "p": 0.1098
+      },
+      {
+        "appointment_id": "A00247",
+        "lead_time_days": 4,
+        "weekday": "thu",
+        "hour": 9,
+        "visit_type": "follow_up",
+        "booking_channel": "phone",
+        "reminder_sent": "yes",
+        "prior_visits": 2,
+        "prior_no_shows": 0,
+        "distance_band": null,
+        "age_band": "45-54",
+        "no_show": 1,
+        "p": 0.1169
+      },
+      {
+        "appointment_id": "A05867",
+        "lead_time_days": 7,
+        "weekday": "fri",
+        "hour": 13,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 5,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "25-34",
+        "no_show": 1,
+        "p": 0.1177
+      },
+      {
+        "appointment_id": "A02243",
+        "lead_time_days": 10,
+        "weekday": "tue",
+        "hour": 14,
+        "visit_type": "follow_up",
+        "booking_channel": "online",
+        "reminder_sent": "yes",
+        "prior_visits": 0,
+        "prior_no_shows": 0,
+        "distance_band": "under_5km",
+        "age_band": "25-34",
+        "no_show": 1,
+        "p": 0.1179
+      },
+      {
+        "appointment_id": "A01777",
+        "lead_time_days": 14,
+        "weekday": "thu",
+        "hour": 15,
+        "visit_type": "wellness_class",
+        "booking_channel": "phone",
+        "reminder_sent": "yes",
+        "prior_visits": 3,
+        "prior_no_shows": 0,
+        "distance_band": "5_15km",
+        "age_band": "25-34",
+        "no_show": 1,
+        "p": 0.1202
+      }
+    ]
+  },
+  "test": {
+    "baseline": {
+      "roc_auc": 0.5,
+      "pr_auc": 0.2078,
+      "brier": 0.1646,
+      "threshold": 0.2,
+      "precision": 0.2078,
+      "recall": 1.0,
+      "f1": 0.3441,
+      "balanced_accuracy": 0.5,
+      "accuracy": 0.2078,
+      "tp": 187,
+      "fp": 713,
+      "fn": 0,
+      "tn": 0
+    },
+    "logistic_regression": {
+      "roc_auc": 0.6168,
+      "pr_auc": 0.3396,
+      "brier": 0.1585,
+      "threshold": 0.22,
+      "precision": 0.295,
+      "recall": 0.508,
+      "f1": 0.3733,
+      "balanced_accuracy": 0.5948,
+      "accuracy": 0.6456,
+      "tp": 95,
+      "fp": 227,
+      "fn": 92,
+      "tn": 486
+    },
+    "random_forest": {
+      "roc_auc": 0.61,
+      "pr_auc": 0.3265,
+      "brier": 0.1592,
+      "threshold": 0.25,
+      "precision": 0.2949,
+      "recall": 0.369,
+      "f1": 0.3278,
+      "balanced_accuracy": 0.5688,
+      "accuracy": 0.6856,
+      "tp": 69,
+      "fp": 165,
+      "fn": 118,
+      "tn": 548
+    },
+    "gradient_boosting": {
+      "roc_auc": 0.6199,
+      "pr_auc": 0.3161,
+      "brier": 0.159,
+      "threshold": 0.23,
+      "precision": 0.2939,
+      "recall": 0.4652,
+      "f1": 0.3602,
+      "balanced_accuracy": 0.5861,
+      "accuracy": 0.6567,
+      "tp": 87,
+      "fp": 209,
+      "fn": 100,
+      "tn": 504
+    }
+  }
+}
