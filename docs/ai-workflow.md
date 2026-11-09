@@ -962,3 +962,10 @@ I created the admin. Go for Phase 1 as planned, with three additions. (a) The ba
 Approved. Commit Phase 1 as proposed. Log this message as prompt 6, marked ‘drafted with help from Claude in a separate chat’, and include it in the same commit. Then show me git log --oneline -3 and git status. Then show me the Phase 2 plan only (the minimal clusters version): engagement features only (no age band, distance band, or the no-show label), scaler, PCA and K-Means fitted on the training rows only, elbow (k=2 to 8) and silhouette, Agglomerative at the chosen k compared with K-Means, 2D PCA points for the plot, a cluster summary with plain-words descriptions that never call clusters patient types or risk groups, a section saying why clusters are exploratory, a read-only member endpoint like the workbench one, tests first, break-it checks, and the regression checks. Keep it as small as it can be and still meet the brief. Don’t push.
 ```
 </details>
+
+<details><summary>7. Phase 2 go, amend the Phase 1 message, weak-structure rule (drafted with help from Claude in a separate chat)</summary>
+
+```text
+Go for Phase 2 as planned. First amend the last commit’s message only, to say 29 tests instead of 33 (no file changes), and tell me the new hash. One addition: if the silhouette scores are low, or k=2 wins by default, say so plainly in the report with the numbers, and treat it as weak structure. Do not tune features, scaling or k to make the clusters look better; the k rule was fixed in advance. If you move the shared logic of the workbench and clusters endpoints into a base view, all the existing workbench endpoint tests must still pass unchanged. Tests first, shown failing, then passing; do the three break-it checks; run the full regression list and show me real outputs, timing and peak memory. Don’t commit until I approve. Don’t push. Log this message as the next prompt, marked ‘drafted with help from Claude in a separate chat’.
+```
+</details>

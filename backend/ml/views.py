@@ -8,6 +8,7 @@ POST /api/ml/v1/no-show/predict/: the educational no-show likelihood demo.
 * Nothing is stored, audited or logged: the inputs are fictional and nothing changes.
 
 GET /api/ml/v1/workbench/: the committed Week 4 comparison report (read-only, members only, throttled).
+GET /api/ml/v1/clusters/: the committed Week 4 exploratory clusters report (same rules).
 """
 import json
 import logging
@@ -23,7 +24,7 @@ from rest_framework.views import APIView
 
 from accounts.authentication import CookieJWTAuthentication
 
-from . import workbench
+from . import clusters, workbench
 from .artifact import NOTICE
 from .predictor import get_predictor
 from .serializers import NoShowRequestDocs, NoShowResponse
@@ -97,17 +98,52 @@ class NoShowPredictView(APIView):
 
 class ReportUnavailable(APIException):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    default_detail = "The comparison report is unavailable right now. Please try again later."
+    default_detail = "The report is unavailable right now. Please try again later."
     default_code = "report_unavailable"
 
 
-class WorkbenchView(APIView):
-    """Serves the committed workbench JSON as it is: it takes no input and changes nothing."""
+REPORT_ERRORS = {
+    401: OpenApiResponse(description="Not signed in as a member."),
+    429: OpenApiResponse(description="Too many requests (60 per minute per member)."),
+    503: OpenApiResponse(description="report_unavailable: the report file could not be read."),
+}
+REPORT_ERRORS_TEXT = (
+    "\n\nErrors: 401 not signed in as a member, 429 more than 60 requests a minute, 503 "
+    "`report_unavailable` (the report file could not be read)."
+)
+
+
+class CommittedReportView(APIView):
+    """
+    Serves one committed report JSON as it is: members only, throttled, takes no input and changes nothing.
+    Subclasses only say which file (read at request time, so tests can point it elsewhere).
+    """
 
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "ml_reports"
+    report_name = "report"
+
+    def report_path(self):
+        raise NotImplementedError
+
+    def get(self, request):
+        try:
+            data = json.loads(self.report_path().read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            logger.warning("%s could not be read (%s)", self.report_name, type(exc).__name__)  # class name only
+            raise ReportUnavailable() from None
+        return Response(data)
+
+
+class WorkbenchView(CommittedReportView):
+    """GET /api/ml/v1/workbench/: the Week 4 supervised comparison report."""
+
+    report_name = "Workbench report"
+
+    def report_path(self):
+        return workbench.RESULTS_PATH
 
     @extend_schema(
         tags=TAG,
@@ -116,20 +152,35 @@ class WorkbenchView(APIView):
             "**Educational comparison on synthetic data. Not medical advice and not a diagnosis.** Returns the "
             "committed output of `python -m ml.workbench` (`version`, metrics per model, tuning, permutation "
             "importance, mistakes and the test-pile note). It ships no model: predictions still use noshow-1.0.0."
-            "\n\nErrors: 401 not signed in as a member, 429 more than 60 requests a minute, 503 "
-            "`report_unavailable` (the report file could not be read)."
+            + REPORT_ERRORS_TEXT
         ),
-        responses={
-            200: OpenApiResponse(response=OpenApiTypes.OBJECT, description="The workbench report."),
-            401: OpenApiResponse(description="Not signed in as a member."),
-            429: OpenApiResponse(description="Too many requests (60 per minute per member)."),
-            503: OpenApiResponse(description="report_unavailable: the report file could not be read."),
-        },
+        responses={200: OpenApiResponse(response=OpenApiTypes.OBJECT, description="The workbench report."),
+                   **REPORT_ERRORS},
     )
     def get(self, request):
-        try:
-            data = json.loads(workbench.RESULTS_PATH.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            logger.warning("Workbench report could not be read (%s)", type(exc).__name__)  # class name only
-            raise ReportUnavailable() from None
-        return Response(data)
+        return super().get(request)
+
+
+class ClustersView(CommittedReportView):
+    """GET /api/ml/v1/clusters/: the Week 4 exploratory clusters report."""
+
+    report_name = "Clusters report"
+
+    def report_path(self):
+        return clusters.RESULTS_PATH
+
+    @extend_schema(
+        tags=TAG,
+        summary="Week 4 exploratory clusters report (educational demo)",
+        description=(
+            "**Exploratory analysis of synthetic data. Not medical advice and not a diagnosis.** Returns the "
+            "committed output of `python -m ml.clusters`: the 5 engagement features used, elbow and silhouette for "
+            "k = 2..8, the chosen k and how strong its structure is, K-Means vs Agglomerative, a cluster summary "
+            "and 2D PCA points. Clusters are not kinds of people and are not used for any decision or prediction."
+            + REPORT_ERRORS_TEXT
+        ),
+        responses={200: OpenApiResponse(response=OpenApiTypes.OBJECT, description="The clusters report."),
+                   **REPORT_ERRORS},
+    )
+    def get(self, request):
+        return super().get(request)
