@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",  # ArrayField for policy chunk embeddings (part of Django, no new package)
     # Third-party
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
@@ -36,6 +37,7 @@ INSTALLED_APPS = [
     "profiles",
     "adminpanel",
     "audit",
+    "llm",  # Week 4: policy documents and chunks for the FAQ assistant
 ]
 
 MIDDLEWARE = [
@@ -100,7 +102,8 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
-    "DEFAULT_THROTTLE_RATES": {"login": "5/min", "ml_predict": "30/min"},
+    "DEFAULT_THROTTLE_RATES": {"login": "5/min", "ml_predict": "30/min", "ml_reports": "60/min",
+                               "llm_ask": "10/min", "llm_upload": "20/min"},
            "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
 }
 
@@ -138,6 +141,27 @@ CSRF_COOKIE_HTTPONLY = False            # frontend must read it to send X-CSRFTo
 CSRF_TRUSTED_ORIGINS = env.list(
     "CSRF_TRUSTED_ORIGINS", default=["http://localhost:3000", "http://127.0.0.1:3000"]
 )
+
+# ---------- LLM FAQ assistant (Week 4) ----------
+# "fake" (default: tests and CI, no network) or "ollama" (a local Ollama server; set it in your own .env only).
+LLM_PROVIDER = env("LLM_PROVIDER", default="fake")
+LLM_BASE_URL = env("LLM_BASE_URL", default="http://127.0.0.1:11434")  # must be this machine (checked)
+LLM_MODEL = env("LLM_MODEL", default="llama3.2:3b")
+LLM_TIMEOUT_SECONDS = env.float("LLM_TIMEOUT_SECONDS", default=100.0)  # measured with retrieval (CPU):
+# cold 36-49 s, warm about 27 s (phase 3 without documents: cold 28-36 s, warm 7-11 s)
+LLM_MAX_TOKENS = 300        # reply limit (Ollama num_predict); room for the answer and up to 3 quotes
+LLM_TEMPERATURE = 0.2       # low: short factual answers, little variation
+LLM_CONTEXT_TOKENS = 2048   # small fixed context window keeps the local model's memory low
+# Retrieval (phase 4). Embedder: "fake" (hashing, no network) or "ollama" (nomic-embed-text); follows LLM_PROVIDER.
+LLM_EMBEDDER = env("LLM_EMBEDDER", default=LLM_PROVIDER)
+LLM_EMBED_MODEL = env("LLM_EMBED_MODEL", default="nomic-embed-text")
+LLM_EMBED_TIMEOUT_SECONDS = env.float("LLM_EMBED_TIMEOUT_SECONDS", default=60.0)
+# Settings so phase 5 can compare two retrieval set-ups (env overrides for experiments only).
+LLM_CHUNK_SIZE = env.int("LLM_CHUNK_SIZE", default=600)            # characters per chunk
+LLM_CHUNK_OVERLAP = env.int("LLM_CHUNK_OVERLAP", default=100)      # characters shared by neighbouring chunks
+LLM_TOP_K = env.int("LLM_TOP_K", default=3)                        # chunks sent to the model at most
+LLM_MIN_SIMILARITY = env.float("LLM_MIN_SIMILARITY", default=0.62)  # cosine, set for nomic-embed-text:
+# 14 probe questions: covered 0.634-0.770, not covered 0.426-0.607. Narrow gap; the citation check is the main guard.
 
 # ---------- API docs (Swagger) ----------
 SPECTACULAR_SETTINGS = {
